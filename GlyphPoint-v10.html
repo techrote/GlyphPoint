@@ -1,0 +1,992 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GlyphPoint v10 — Precision Glyph Grid Editor</title>
+<style>
+:root{
+  color-scheme:light;
+  --ui:#f3f4f6;--panel:#fff;--line:#c8ccd1;--line2:#dde0e4;--blue:#2b78d4;
+  --text:#202124;--muted:#666b72;--cell-fs:12px;--cell-lh:1em;--zoom:1;
+  --ui-font:"Segoe UI",Tahoma,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden}
+body{font:11px/1.2 var(--ui-font);color:var(--text);background:#cfd3d8}
+button,input,select,textarea{font:11px/1.15 var(--ui-font);color:inherit}
+button{cursor:pointer}svg{display:block}
+#app{height:100%;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:30px 96px minmax(0,1fr) 24px;background:#e7e9ec}
+.titlebar{grid-row:1;display:flex;align-items:center;gap:4px;padding:0 5px;background:#fff;border-bottom:1px solid #d4d7db;user-select:none;min-width:0}
+.appmark{width:18px;text-align:center;font:700 16px/1 "Cascadia Mono",Consolas,monospace;color:var(--blue)}
+.title{font-size:12px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.quick{display:flex;align-items:center;gap:2px}
+.quick button,.modeToggle,.titlebar .filebtn{height:22px;min-width:26px;border:1px solid transparent;background:transparent;border-radius:3px;padding:2px 6px;display:inline-flex;align-items:center;justify-content:center;gap:4px}
+.quick button:hover,.modeToggle:hover,.titlebar .filebtn:hover{background:#e8eef7;border-color:#bdcce0}
+.titlebar .filebtn{min-width:42px;background:#2878d0;color:#fff;border-color:#2878d0;margin-right:3px}.titlebar .filebtn:hover{background:#1f69ba;border-color:#1f69ba}
+.modeToggle{min-width:68px;font-size:10px}
+.ribbonwrap{grid-row:2;background:#f5f6f7;border-bottom:1px solid #bfc3c8;user-select:none;min-width:0;overflow:hidden}
+.ribbon{height:96px;display:flex;align-items:stretch;gap:0;padding:3px;overflow-x:auto;overflow-y:hidden;background:linear-gradient(#fafbfc,#f0f1f3)}
+.group{display:flex;align-items:center;gap:4px;padding:3px 5px;border-right:1px solid #d3d6da;min-width:max-content}
+.group:last-child{border-right:0}.group::after{display:none!important;content:none!important}
+.smallcol{display:flex;flex-direction:column;gap:2px;min-width:0}
+.smallbtn,.toolbtn,.xformbtn,.viewbtn{height:24px;border:1px solid transparent;background:transparent;border-radius:3px;padding:2px 5px;white-space:nowrap}
+.smallbtn:hover,.toolbtn:hover,.xformbtn:hover,.shape:hover,.bsbtn:hover,.gp-ctrl button:hover,.viewbtn:hover{background:#e5eef9;border-color:#9fc3ee}
+.toolbtn.active,.shape.active,.bsbtn.active,.gp-ctrl button.active,#selectBtn.active{background:#cfe4fb;border-color:#6fa6de}
+.iconbtn{width:30px;height:30px;padding:4px;display:inline-flex;align-items:center;justify-content:center}.iconbtn svg,.toolbtn svg,.viewbtn svg,#selectBtn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.iconrow{display:grid;grid-template-columns:repeat(3,30px);gap:2px}
+.toolgrid{display:grid;grid-template-columns:repeat(3,32px);grid-auto-rows:32px;gap:2px}.toolbtn{width:32px;height:32px;padding:5px;display:flex;align-items:center;justify-content:center}.toolbtn svg{width:18px;height:18px}
+.grp-glyph{align-items:flex-start}.glyphstack{display:flex;flex-direction:column;gap:2px;width:250px}
+.gp-top{display:flex;gap:3px;align-items:stretch}.gp-slots{display:flex;flex-direction:column;gap:2px}.gp-slot{width:27px;height:23px;border:1px solid #92979d;background:#fff;display:grid;grid-template-columns:8px 1fr;align-items:center;padding:1px}
+.gp-slot-label{font-size:8px;color:#6c7177;line-height:1}.gp-slot-char{font:700 13px/1 "Cascadia Mono",Consolas,monospace;text-align:center;overflow:hidden}
+.gp-grid{display:grid;grid-template-columns:repeat(9,23px);grid-auto-rows:23px;gap:1px;max-height:47px;overflow-y:auto;overflow-x:hidden}
+.gp-btn{width:23px;height:23px;border:1px solid #b9bdc2;background:#fff;padding:0;font:700 13px/1 "Cascadia Mono",Consolas,monospace;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative}
+.gp-btn:hover{outline:1px solid #70a7df;outline-offset:-1px}.gp-btn.prime{box-shadow:inset 0 0 0 2px #2b78d4}.gp-btn.sec{outline:1px dashed #bb6f25;outline-offset:-2px}.gp-btn.editing{cursor:text}.gp-btn.gp-add{font:700 16px/1 var(--ui-font);background:#eef4fa}.gp-btn.gp-add::after{content:"add";position:absolute;right:1px;bottom:0;font:6px/1 var(--ui-font);color:#65717e}
+.gp-ctrl{display:flex;gap:2px;align-items:center;height:20px}.gp-ctrl button{height:20px;border:1px solid #b9bdc2;background:#f7f7f8;border-radius:2px;padding:1px 6px;font-size:9px}.gp-ctrl .grow{flex:1}.palette-bgctl{display:flex;align-items:center;gap:3px;font-size:9px;white-space:nowrap}.palette-bgctl input{width:25px;height:19px;padding:1px;border:1px solid #aaa;background:#fff}.gp-edit-hint{font-size:9px;color:#7a4c16;white-space:nowrap}
+.brushrow{display:flex;align-items:center;gap:4px;height:25px;white-space:nowrap}.brushrow>label{color:#555}.brushrow input{width:48px;height:22px;padding:1px 4px}.brushshape{display:flex;align-items:center;gap:1px;margin-left:2px}.brushshape-label{font-size:9px;color:#666;margin-right:1px}
+.bsbtn{width:24px;height:22px;border:1px solid #b9bdc2;background:#fff;border-radius:2px;padding:0;font:13px/1 "Cascadia Mono",Consolas,monospace}.bsbtn.ratio{display:grid;place-items:center}.ratio-shape{display:block;background:currentColor;border-radius:1px}.ratio-shape.vertical.short{width:4px;height:12px}.ratio-shape.horizontal.short{width:12px;height:4px}.ratio-shape.vertical.long{width:3px;height:17px}.ratio-shape.horizontal.long{width:17px;height:3px}
+.grp-shapes{align-items:flex-start}.shapegrid{display:grid;grid-template-columns:repeat(6,27px);grid-auto-rows:27px;gap:1px;width:167px}.shape{width:27px;height:27px;border:1px solid transparent;background:#fff;padding:0;font:13px/1 "Cascadia Mono",Consolas,monospace}
+.options{display:grid;grid-template-columns:38px 76px;gap:2px 3px;align-content:center;font-size:10px}.options select{height:22px;font-size:10px;min-width:0}.options label{color:#555;align-self:center}
+#selectBtn{width:48px;height:66px;border:1px solid transparent;background:transparent;border-radius:3px;padding:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10px}.grp-selection>.smallcol{width:164px!important}#selectMode{width:164px;height:22px}.sel-grid{display:grid;grid-template-columns:repeat(4,39px);gap:2px}.sel-grid .smallbtn{width:39px;padding:2px;font-size:9px}.sel-chk{display:flex;align-items:center;gap:3px;font-size:9px;height:17px;white-space:nowrap}
+.transformgrid{display:grid;grid-template-columns:repeat(3,34px);grid-auto-rows:27px;gap:2px}.xformbtn{width:34px;height:27px;padding:1px 2px;font:10px/1 "Cascadia Mono",Consolas,monospace}.xformbtn:nth-child(4),.xformbtn:nth-child(5),.xformbtn.rotbtn{font-size:16px}
+.grp-view{align-items:flex-start}.viewcompact{display:grid;grid-template-columns:auto auto;grid-template-rows:auto auto;gap:4px 7px;align-items:center}.viewbuttons{display:flex;gap:2px;grid-column:1/-1}.viewbtn{width:30px;height:28px;padding:3px;display:flex;align-items:center;justify-content:center;font-size:10px}.viewbtn.textwide{width:38px;font:700 9px/1 "Cascadia Mono",Consolas,monospace}.viewopts{display:grid;grid-template-columns:repeat(2,max-content);gap:2px 7px;align-items:center;font-size:9px}.viewopts label{display:flex;align-items:center;gap:2px;white-space:nowrap}.squarebtn{height:22px;border:1px solid #b9bdc2;background:#fff;border-radius:2px;padding:1px 6px;font-size:9px}.squarebtn[aria-pressed="true"]{background:#cfe4fb;border-color:#6fa6de;font-weight:600}.bgctl{display:flex;align-items:center;gap:3px;white-space:nowrap;font-size:9px}.bgctl input[type=color]{width:27px;height:24px;padding:1px;border:1px solid #aaa;background:#fff}
+.workspace{grid-row:3;min-width:0;min-height:0;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);background:#b8bec5;overflow:hidden;position:relative}
+.rulerCorner{width:30px;height:22px;background:#eee;border-right:1px solid #aaa;border-bottom:1px solid #aaa}.hruler{height:22px;background:#eee;border-bottom:1px solid #aaa;overflow:hidden;position:relative;font:9px/22px Consolas,monospace;color:#555;white-space:nowrap}.vruler{width:30px;background:#eee;border-right:1px solid #aaa;overflow:hidden;position:relative;font:9px Consolas,monospace;color:#555}
+.workspace.no-rulers{grid-template-columns:0 minmax(0,1fr);grid-template-rows:0 minmax(0,1fr)}.workspace.no-rulers .rulerCorner,.workspace.no-rulers .hruler,.workspace.no-rulers .vruler{display:none}
+.scroller{overflow:auto;position:relative;padding:14px;grid-column:2;grid-row:2}.canvasWrap{position:relative;width:max-content;height:max-content;background:#fff;box-shadow:0 0 0 1px #777,2px 2px 5px #0004;transform-origin:top left}
+#canvasGrid{display:grid;gap:0;background:#000;font-family:"Cascadia Mono","Cascadia Code",Consolas,"DejaVu Sans Mono",monospace;font-size:var(--cell-fs);line-height:var(--cell-lh);font-variant-ligatures:none;font-feature-settings:"liga" 0,"calt" 0;user-select:none;touch-action:none}
+#canvasGrid.squarecells{grid-template-columns:repeat(80,1em)}#canvasGrid.squarecells .cell{width:1em;height:1em}.cell{width:1ch;height:1em;overflow:hidden;text-align:center;white-space:pre;display:block;position:relative}.gridlines .cell{outline:1px solid rgba(125,160,210,.24);outline-offset:-1px}.cell.selected{box-shadow:inset 0 0 0 1px #00a8ff;background-image:linear-gradient(45deg,#00a8ff22 25%,transparent 25%,transparent 50%,#00a8ff22 50%,#00a8ff22 75%,transparent 75%);background-size:4px 4px}.cell.preview{box-shadow:inset 0 0 0 1px #f0f,inset 0 0 0 2px #fff8}.cell.cursorcell{outline:1px dotted #fff;outline-offset:-1px}.cell.hovered{outline:1px solid #ffcc00!important;outline-offset:-1px;z-index:1}
+.statusbar{grid-row:4;height:24px;background:#f6f7f8;border-top:1px solid #b8bcc1;display:flex;align-items:center;gap:12px;padding:0 6px;font-size:10px;user-select:none;min-width:0}.statusbar.hidden{display:none}.statusbar .grow{flex:1;min-width:20px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.zoomCtl{display:flex;align-items:center;gap:4px}.zoomCtl button{width:21px;height:19px;padding:0;border:1px solid #bbb;background:#fff;border-radius:2px}.zoomCtl input{width:110px}
+.dropdown{position:fixed;z-index:50;display:none;background:#fff;border:1px solid #999;box-shadow:2px 4px 15px #0004;padding:3px;min-width:220px}.dropdown.open{display:block}.dropdown button{display:block;width:100%;text-align:left;border:0;background:#fff;padding:6px 9px}.dropdown button:hover{background:#dceeff}.dropdown hr{border:0;border-top:1px solid #ddd;margin:3px}
+dialog{border:1px solid #888;border-radius:2px;box-shadow:0 6px 30px #0006;padding:0;max-width:min(92vw,560px);font:11px/1.2 var(--ui-font)}dialog::backdrop{background:#0004}.dlgTitle{background:#f4f4f4;padding:8px 11px;border-bottom:1px solid #ccc;font-weight:600}.dlgBody{padding:12px;background:#fff}.dlgGrid{display:grid;grid-template-columns:145px 1fr;gap:8px;align-items:center}.dlgActions{padding:8px 12px;border-top:1px solid #ddd;background:#f7f7f7;display:flex;justify-content:flex-end;gap:6px}.dlgActions button{min-width:72px;padding:4px 9px}.textArea{width:100%;height:100px;font-family:Consolas,monospace}.kbd{font:9px Consolas,monospace;background:#eee;border:1px solid #ccc;border-bottom-width:2px;padding:1px 3px;border-radius:3px}.helpcols{columns:2;column-gap:24px;font-size:11px}.helpcols p{break-inside:avoid;margin:0 0 8px}
+.paletteEditRow{display:grid;grid-template-columns:70px 1fr;gap:8px;align-items:center}.paletteEditRow input[type=color]{width:100%;height:30px}
+.gcm-dialog{width:min(96vw,820px);max-width:820px;height:min(88vh,760px);max-height:88vh;overflow:hidden}.gcm-dialog[open]{display:grid;grid-template-rows:auto minmax(0,1fr) auto}.gcm-titlebar{position:relative;display:flex;align-items:center;gap:5px;background:#f4f4f4;padding:4px 5px;border-bottom:1px solid #ccc;font-weight:600}.gcm-titletext{margin-right:auto;padding-left:5px}.gcm-menubtn,.gcm-closex{height:24px;border:1px solid transparent;background:transparent;border-radius:3px;padding:2px 7px}.gcm-menubtn:hover,.gcm-closex:hover{background:#e1e8f2;border-color:#aabbd0}.gcm-closex{font-size:16px;line-height:16px;min-width:28px}.gcm-menu{position:fixed;z-index:400;display:none;background:#fff;border:1px solid #888;box-shadow:2px 4px 14px #0004;padding:3px;min-width:190px}.gcm-menu.open{display:block}.gcm-menu button{display:block;width:100%;border:0;background:#fff;text-align:left;padding:6px 9px}.gcm-menu button:hover{background:#dceeff}.gcm-dialog .dlgBody{min-height:0;display:flex;flex-direction:column;overflow:hidden}.gcm-toolbar{display:grid;grid-template-columns:minmax(180px,1fr) 150px;gap:7px;margin-bottom:8px}.gcm-toolbar input,.gcm-toolbar select{height:28px}.gcm-list{min-height:0;flex:1 1 auto;overflow:auto;border:1px solid var(--line);background:#fff}.gcm-head,.gcm-row{display:grid;grid-template-columns:54px 48px 8ch 56px minmax(110px,1fr) 96px;gap:6px;align-items:center;padding:4px 6px}.gcm-head{position:sticky;top:0;z-index:1;background:#eef0f3;border-bottom:1px solid var(--line);font-weight:600}.gcm-row{min-height:36px;border-bottom:1px solid var(--line2)}.gcm-row:last-child{border-bottom:0}.gcm-glyph{width:4ch;text-align:center;font:700 15px/1.2 "Cascadia Mono",Consolas,monospace}.gcm-colour{width:42px;height:28px;padding:1px}.gcm-hex{width:8ch;font-family:Consolas,monospace}.gcm-represents{width:100%;min-width:80px}.gcm-glyph.invalid,.gcm-hex.invalid{border-color:#b00020;background:#fff0f2}.gcm-actions{display:flex;gap:3px}.gcm-actions button{padding:3px 5px}.gcm-empty{padding:18px;text-align:center;color:var(--muted)}.gcm-status{margin-top:6px;color:var(--muted);min-height:14px}.gcm-spacer{flex:1}.ui-classic .gcm-list{border:2px solid;border-color:#404040 #fff #fff #404040}.ui-classic .gcm-titlebar,.ui-classic .gcm-head{background:#c0c0c0}.ui-classic .gcm-titlebar{margin:2px;background:#000080;color:#fff;border:0}.ui-classic .gcm-row{border-bottom-color:#808080}.ui-classic .gcm-actions button,.ui-classic .gcm-menubtn,.ui-classic .gcm-closex{background:#c0c0c0;color:#000;border:2px solid;border-color:#fff #404040 #404040 #fff;border-radius:0}@media(max-width:700px){.gcm-dialog{width:98vw;height:92vh;max-height:92vh}.gcm-head,.gcm-row{grid-template-columns:45px 40px 8ch 38px minmax(80px,1fr) 82px;gap:3px;padding:4px 3px}.gcm-toolbar{grid-template-columns:1fr}.gcm-actions button{padding:3px}.gcm-dialog .dlgActions{flex-wrap:wrap}} 
+.cpick{position:fixed;z-index:200;background:#fff;border:1px solid #888;box-shadow:0 6px 24px #0006;padding:8px;width:216px}.cpick-head{display:flex;gap:6px;align-items:center;margin-bottom:6px}.cpick-swatch{width:32px;height:20px;border:1px solid #999;border-radius:2px;flex:none}.cpick-hex{flex:1;font:11px Consolas,monospace;padding:2px 4px;border:1px solid #bbb}.cpick label{display:flex;align-items:center;gap:6px;font-size:10px;color:#555;margin:2px 0}.cpick label span{width:64px}.cpick label input[type=range]{flex:1;height:14px}.cpick-presets{display:grid;grid-template-columns:repeat(6,26px);gap:3px;margin-top:6px}.cpick-preset{width:26px;height:18px;border:1px solid #999;border-radius:2px;cursor:pointer;padding:0}
+/* Win98-style side UI: same controls, different layout only. */
+/* Modern ribbon: use vertical space deliberately so controls group compactly instead of forming one long strip. */
+#app:not(.classic){grid-template-rows:30px 138px minmax(0,1fr) 24px}
+#app:not(.classic) .ribbon{height:138px;padding:5px 4px;align-items:stretch;overflow-x:auto;overflow-y:hidden}
+#app:not(.classic) .group{align-items:flex-start;justify-content:flex-start;gap:4px;padding:3px 6px}
+
+/* 2 x 3 tool bank: same targets, substantially less horizontal footprint. */
+#app:not(.classic) .grp-tools{align-items:flex-start}
+#app:not(.classic) .toolgrid{grid-template-columns:repeat(2,32px);grid-template-rows:repeat(3,32px);grid-auto-rows:32px;gap:3px}
+
+/* Palette gets two functional rows below the glyph tiles: edit controls, then brush configuration. */
+#app:not(.classic) .glyphstack{width:238px;gap:2px}
+#app:not(.classic) .gp-grid{grid-template-columns:repeat(9,22px);grid-auto-rows:22px;gap:1px;max-height:45px}
+#app:not(.classic) .gp-btn{width:22px;height:22px}
+#app:not(.classic) .gp-slot{width:27px;height:22px}
+#app:not(.classic) .gp-ctrl{height:20px}.palette-bgctl{margin-left:auto}
+#app:not(.classic) .brushrow{height:auto;display:grid;grid-template-columns:28px 52px 1fr;grid-template-rows:22px 22px;gap:2px 3px;align-items:center;white-space:nowrap}
+#app:not(.classic) .brushrow>label{grid-column:1}
+#app:not(.classic) .brushrow>input{grid-column:2;width:52px;height:22px}
+#app:not(.classic) .brushshape{grid-column:1/-1;display:grid;grid-template-columns:28px repeat(6,24px);gap:2px;margin:0;align-items:center}
+#app:not(.classic) .brushshape-label{margin:0}
+
+/* Shapes use a tall 3 x 4 bank, with stroke/fill controls beside it. */
+#app:not(.classic) .grp-shapes{align-items:flex-start}
+#app:not(.classic) .shapegrid{grid-template-columns:repeat(3,27px);grid-template-rows:repeat(4,27px);grid-auto-rows:27px;width:83px;gap:1px}
+#app:not(.classic) .options{grid-template-columns:37px 74px;gap:3px;align-content:start;padding-top:1px}
+#app:not(.classic) .options select{height:23px}
+
+/* Clipboard is a vertical command rail instead of consuming three columns. */
+#app:not(.classic) .grp-clipboard .iconrow{grid-template-columns:30px;grid-template-rows:repeat(3,30px);gap:3px}
+
+/* Selection becomes one compact vertical block. */
+#app:not(.classic) .grp-selection{display:grid;grid-template-columns:142px;grid-template-rows:27px 22px 48px 17px;gap:2px;align-content:start}
+#app:not(.classic) #selectBtn{grid-row:1;width:142px;height:27px;flex-direction:row;gap:5px;padding:2px 5px}
+#app:not(.classic) .grp-selection>.smallcol{display:contents;width:auto!important}
+#app:not(.classic) #selectMode{grid-row:2;width:142px;height:22px}
+#app:not(.classic) .sel-grid{grid-row:3;grid-template-columns:repeat(2,70px);grid-template-rows:repeat(2,23px);gap:2px}
+#app:not(.classic) .sel-grid .smallbtn{width:70px;height:23px;font-size:9px}
+#app:not(.classic) .sel-chk{grid-row:4;height:17px}
+
+/* Transform now uses three rows rather than a wide three-column shelf. */
+#app:not(.classic) .transformgrid{grid-template-columns:repeat(2,41px);grid-template-rows:repeat(3,27px);grid-auto-rows:27px;gap:3px}
+#app:not(.classic) .xformbtn{width:41px;height:27px}
+
+/* View uses the increased ribbon height: 2 x 2 zoom controls, 2 x 2 toggles, field colour below. */
+#app:not(.classic) .viewcompact{width:104px;display:grid;grid-template-columns:1fr;grid-template-rows:auto auto auto;gap:5px;align-items:start}
+#app:not(.classic) .viewbuttons{grid-column:1;display:grid;grid-template-columns:repeat(2,48px);grid-template-rows:repeat(2,28px);gap:3px}
+#app:not(.classic) .viewbtn,#app:not(.classic) .viewbtn.textwide{width:48px;height:28px}
+#app:not(.classic) .viewopts{grid-template-columns:repeat(2,max-content);gap:3px 7px;font-size:9px}.squarebtn{grid-column:1/-1;width:100%}
+#app:not(.classic) .bgctl{height:24px}
+#app.classic{grid-template-columns:286px minmax(0,1fr);grid-template-rows:30px minmax(0,1fr) 24px;background:#c0c0c0}
+#app.classic .titlebar{grid-row:1;grid-column:1/-1;height:30px;margin:0;padding:3px 4px;background:linear-gradient(90deg,#000080,#1084d0);border:2px solid;border-color:#fff #404040 #404040 #fff;color:#fff;font-family:Tahoma,"MS Sans Serif",Arial,sans-serif;gap:4px}
+#app.classic .appmark{color:#fff;width:18px}#app.classic .title{font-weight:700;font-size:11px;text-shadow:1px 1px #000}
+#app.classic .quick button,#app.classic .modeToggle,#app.classic .titlebar .filebtn{height:20px;min-width:24px;background:#c0c0c0;color:#000;border:2px solid;border-color:#fff #404040 #404040 #fff;border-radius:0;padding:0 5px;box-shadow:none;margin:0}
+#app.classic .titlebar .filebtn{min-width:40px}#app.classic .quick button:active,#app.classic .modeToggle:active,#app.classic .titlebar .filebtn:active{border-color:#404040 #fff #fff #404040;padding:1px 4px 0 6px}
+#app.classic .ribbonwrap{grid-row:2;grid-column:1;min-height:0;background:#c0c0c0;border-right:2px solid #808080;border-bottom:0;overflow:hidden}
+#app.classic .ribbon{height:auto;min-height:100%;width:100%;flex-direction:column;align-items:stretch;overflow:visible;padding:4px;gap:8px;background:#c0c0c0}
+#app.classic .group{width:100%;min-width:0;flex-wrap:wrap;align-items:center;gap:4px;padding:5px;background:#c0c0c0;border:2px solid;border-color:#fff #808080 #808080 #fff}
+#app.classic .smallbtn,#app.classic .toolbtn,#app.classic .xformbtn,#app.classic .bsbtn,#app.classic .gp-ctrl button,#app.classic .shape,#app.classic .viewbtn,#app.classic #selectBtn,#app.classic .zoomCtl button{background:#c0c0c0;border:2px solid;border-color:#fff #404040 #404040 #fff;border-radius:0;color:#000}
+#app.classic .smallbtn:active,#app.classic .toolbtn:active,#app.classic .xformbtn:active,#app.classic .bsbtn:active,#app.classic .gp-ctrl button:active,#app.classic .shape:active,#app.classic .viewbtn:active,#app.classic #selectBtn:active,#app.classic .toolbtn.active,#app.classic .shape.active,#app.classic .bsbtn.active,#app.classic .gp-ctrl button.active,#app.classic #selectBtn.active{border-color:#404040 #fff #fff #404040;background:#b8b8b8;box-shadow:none;outline:0}
+#app.classic .grp-tools{order:1}#app.classic .grp-view{order:2}#app.classic .grp-glyph{order:3}#app.classic .grp-shapes{order:4}#app.classic .grp-clipboard{order:5}#app.classic .grp-selection{order:6}#app.classic .grp-transform{order:7}
+#app.classic .grp-tools .toolgrid{width:100%;grid-template-columns:repeat(3,1fr);grid-auto-rows:52px;gap:4px}#app.classic .grp-tools .toolbtn{width:auto;height:52px;padding:8px}#app.classic .grp-tools .toolbtn svg{width:26px;height:26px}
+#app.classic .glyphstack{width:100%}#app.classic .gp-top{width:100%}#app.classic .gp-grid{flex:none;grid-template-columns:repeat(6,34px);max-height:none;grid-auto-rows:34px;gap:2px}#app.classic .gp-btn{width:34px;height:34px;background:#fff;border:2px solid;border-color:#fff #404040 #404040 #fff;border-radius:0;font-size:16px}#app.classic .gp-btn.prime{box-shadow:inset 0 0 0 2px #000080}#app.classic .gp-btn.sec{outline:1px dashed #800000;outline-offset:-3px}#app.classic .gp-slot{width:31px;height:34px;border:2px solid;border-color:#404040 #fff #fff #404040;background:#fff}#app.classic .gp-ctrl{width:100%;height:26px}#app.classic .gp-ctrl button{height:25px;font-size:10px}#app.classic .gp-ctrl .grow{display:block}#app.classic .gp-edit-hint{font-size:9px}
+#app.classic .brushrow{width:100%;height:auto;display:grid;grid-template-columns:42px 1fr 48px;gap:3px;align-items:center}#app.classic .brushrow input{height:27px;width:100%}#app.classic .brushshape{grid-column:1/-1;display:grid;grid-template-columns:28px repeat(6,1fr);gap:2px;margin:0}#app.classic .brushshape-label{font-size:10px;align-self:center}#app.classic .bsbtn{width:auto;height:30px}
+#app.classic .grp-shapes{align-items:flex-start}#app.classic .shapegrid{width:214px;grid-template-columns:repeat(6,34px);grid-auto-rows:34px;gap:2px}#app.classic .shape{width:34px;height:34px;font-size:16px}#app.classic .options{width:100%;grid-template-columns:48px 1fr;gap:3px}#app.classic .options select{height:27px}
+#app.classic .grp-clipboard .iconrow{width:100%;grid-template-columns:repeat(3,1fr);gap:4px}#app.classic .grp-clipboard .iconbtn{width:auto;height:32px}
+#app.classic .grp-selection{align-items:stretch}#app.classic #selectBtn{width:100%;height:34px;flex-direction:row;gap:5px;font-size:11px}#app.classic .grp-selection>.smallcol{width:100%!important}#app.classic #selectMode{width:100%;height:27px}#app.classic .sel-grid{grid-template-columns:repeat(4,1fr);gap:3px}#app.classic .sel-grid .smallbtn{width:auto;height:28px;font-size:10px}#app.classic .sel-chk{height:20px;font-size:10px}
+#app.classic .transformgrid{width:100%;grid-template-columns:repeat(3,1fr);grid-auto-rows:30px;gap:3px}#app.classic .xformbtn{width:auto;height:30px;font-size:10px}#app.classic .xformbtn:nth-child(4),#app.classic .xformbtn:nth-child(5){font-size:15px}
+#app.classic .viewcompact{width:100%;grid-template-columns:1fr;grid-template-rows:auto auto auto;gap:5px}#app.classic .viewbuttons{grid-column:1;display:grid;grid-template-columns:repeat(4,1fr);gap:3px}#app.classic .viewbtn{width:auto;height:32px}#app.classic .viewopts{grid-template-columns:1fr 1fr;font-size:10px;gap:4px 8px}#app.classic .bgctl{font-size:10px}#app.classic .bgctl input[type=color]{width:42px;height:28px}
+.ui-classic select,.ui-classic input[type=number],.ui-classic input[type=text],.ui-classic textarea{border:2px solid;border-color:#404040 #fff #fff #404040;border-radius:0;background:#fff;color:#000}.ui-classic input[type=color]{border:2px solid;border-color:#404040 #fff #fff #404040;border-radius:0;background:#c0c0c0}
+#app.classic .workspace{grid-row:2;grid-column:2;background:#808080;border-top:1px solid #404040}#app.classic .scroller{padding:10px}#app.classic .statusbar{grid-row:3;grid-column:1/-1;height:24px;background:#c0c0c0;border-top:2px solid #fff;gap:6px;padding:2px 4px;font-family:Tahoma,"MS Sans Serif",Arial,sans-serif}#app.classic .statusbar>span{border:1px solid;border-color:#808080 #fff #fff #808080;padding:2px 4px;height:18px;display:flex;align-items:center}#app.classic .statusbar .grow{display:flex}
+.ui-classic .dropdown,.ui-classic dialog,.ui-classic .cpick{font-family:Tahoma,"MS Sans Serif",Arial,sans-serif;background:#c0c0c0;border:2px solid;border-color:#fff #404040 #404040 #fff;border-radius:0;box-shadow:2px 2px 0 #000}.ui-classic .dropdown button,.ui-classic .dlgBody,.ui-classic .dlgActions,.ui-classic .dlgTitle{background:#c0c0c0}.ui-classic .dropdown button:hover{background:#000080;color:#fff}.ui-classic .dlgTitle{background:#000080;color:#fff;border-bottom:0;margin:2px;padding:4px 6px;font-weight:700}.ui-classic .dlgActions{border-top:1px solid #808080}.ui-classic .dlgActions button{background:#c0c0c0;border:2px solid;border-color:#fff #404040 #404040 #fff;border-radius:0}.ui-classic .kbd{border-radius:0;background:#fff}
+/* Classic side-panel refinement v4: 214 px control lattice inside a 236 px shell. */
+#app.classic{grid-template-columns:236px minmax(0,1fr)}
+#app.classic .ribbon{padding:4px;gap:8px}
+#app.classic .group{width:100%;min-width:0;padding:3px 5px;gap:2px;align-items:flex-start;align-content:flex-start}
+#app.classic .grp-tools{order:1}
+#app.classic .grp-glyph{order:2}
+#app.classic .grp-shapes{order:3}
+#app.classic .grp-selection{order:4}
+#app.classic .grp-clipboard{order:5}
+#app.classic .grp-transform{order:6}
+#app.classic .grp-view{order:7}
+
+/* Six drawing tools: each spans two cells of the 6-column, 34 px shape lattice. */
+#app.classic .grp-tools .toolgrid{width:214px;grid-template-columns:repeat(3,70px);grid-template-rows:repeat(2,36px);grid-auto-rows:36px;gap:2px}
+#app.classic .grp-tools .toolbtn{width:70px;height:36px;padding:6px}
+#app.classic .grp-tools .toolbtn svg{width:22px;height:22px}
+
+/* Palette: primary/secondary and edit controls share one compact row; palette remains 34 px per cell. */
+#app.classic .glyphstack{width:214px;display:grid;grid-template-columns:70px 142px;grid-template-areas:"slots controls" "palette palette" "brush brush";gap:2px}
+#app.classic .gp-top{display:contents}
+#app.classic .gp-slots{grid-area:slots;display:flex;flex-direction:row;gap:2px;width:70px}
+#app.classic .gp-slot{width:34px;height:30px;grid-template-columns:8px 1fr;padding:1px}
+#app.classic .gp-slot-char{font-size:15px}
+#app.classic .gp-grid{grid-area:palette;width:214px;grid-template-columns:repeat(6,34px);grid-auto-rows:34px;gap:2px;max-height:none;overflow:visible}
+#app.classic .gp-btn{width:34px;height:34px;font-size:16px}
+#app.classic .gp-ctrl{grid-area:controls;width:142px;height:30px;gap:2px;align-items:center}
+#app.classic .gp-ctrl button{height:30px;padding:1px 7px;font-size:10px}
+#app.classic #gpEditBtn,#app.classic #gpResetBtn{min-width:38px}.ui-classic .palette-bgctl{font-size:0;gap:0}.ui-classic .palette-bgctl input{width:30px;height:30px;border:2px solid;border-color:#404040 #fff #fff #404040;background:#c0c0c0}
+#app.classic #gpBgBtn{width:30px;min-width:30px;padding:0;font-size:14px}
+#app.classic .gp-edit-hint{display:none!important}
+#app.classic .brushrow{grid-area:brush;width:214px;height:auto;display:grid;grid-template-columns:34px 58px 1fr;grid-template-rows:24px 26px;gap:2px;align-items:center}
+#app.classic .brushrow>label{grid-column:1;grid-row:1;font-size:10px}
+#app.classic .brushrow>input{grid-column:2;grid-row:1;width:58px;height:24px}
+#app.classic .brushshape{grid-column:1/-1;grid-row:2;display:grid;grid-template-columns:repeat(6,34px);gap:2px;margin:0;width:214px}
+#app.classic .brushshape-label{display:none}
+#app.classic .bsbtn{width:34px;height:26px;font-size:13px}
+#app.classic .bsbtn.ratio{font-size:8px}
+
+/* Shapes are the dimensional reference: 6 x 34 px, two rows. Controls align to the same 3-column rhythm. */
+#app.classic .grp-shapes{display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+#app.classic .shapegrid{width:214px;grid-template-columns:repeat(6,34px);grid-template-rows:repeat(2,34px);grid-auto-rows:34px;gap:2px}
+#app.classic .shape{width:34px;height:34px;font-size:16px}
+#app.classic .options{width:214px;display:grid;grid-template-columns:repeat(3,70px);grid-template-rows:12px 24px;gap:2px;font-size:9px;align-content:start}
+#app.classic .options>label{grid-row:1;text-align:left;align-self:end;font-size:9px}
+#app.classic .options>select{grid-row:2;width:70px;height:24px;font-size:10px}
+#app.classic .options>label:nth-child(1),#app.classic .options>select:nth-child(2){grid-column:1}
+#app.classic .options>label:nth-child(3),#app.classic .options>select:nth-child(4){grid-column:2}
+#app.classic .options>label:nth-child(5),#app.classic .options>select:nth-child(6){grid-column:3}
+
+/* Selection: tool/mode share a row; actions use four equal cells below. */
+#app.classic .grp-selection{display:grid;grid-template-columns:70px 142px;grid-template-rows:30px 24px 16px;gap:2px;align-items:stretch}
+#app.classic #selectBtn{grid-column:1;grid-row:1;width:70px;height:30px;flex-direction:row;gap:4px;padding:2px 5px;font-size:10px}
+#app.classic #selectBtn svg{width:15px;height:15px}
+#app.classic .grp-selection>.smallcol{display:contents;width:auto!important}
+#app.classic #selectMode{grid-column:2;grid-row:1;width:142px;height:30px;font-size:10px}
+#app.classic .sel-grid{grid-column:1/-1;grid-row:2;width:214px;grid-template-columns:repeat(4,52px);grid-template-rows:24px;gap:2px}
+#app.classic .sel-grid .smallbtn{width:52px;height:24px;padding:1px 2px;font-size:9px}
+#app.classic .sel-chk{grid-column:1/-1;grid-row:3;height:16px;font-size:9px;margin:0}
+
+/* Clipboard and transforms follow the same 3-column, 70 px button rhythm as Tools. */
+#app.classic .grp-clipboard .iconrow{width:214px;grid-template-columns:repeat(3,70px);grid-template-rows:28px;gap:2px}
+#app.classic .grp-clipboard .iconbtn{width:70px;height:28px;padding:4px}
+#app.classic .grp-transform .transformgrid{width:214px;grid-template-columns:repeat(3,70px);grid-template-rows:repeat(2,26px);grid-auto-rows:26px;gap:2px}
+#app.classic .grp-transform .xformbtn{width:70px;height:26px;padding:1px 2px;font-size:10px}
+#app.classic .grp-transform .xformbtn:nth-child(4),#app.classic .grp-transform .xformbtn:nth-child(5){font-size:14px}
+
+/* View uses four equal buttons across the same 214 px lattice, then a terse status/options row. */
+#app.classic .viewcompact{width:214px;display:grid;grid-template-columns:1fr;grid-template-rows:26px 16px 24px;gap:2px;align-items:center}
+#app.classic .viewbuttons{grid-column:1;grid-row:1;display:grid;grid-template-columns:repeat(4,52px);grid-template-rows:26px;gap:2px;width:214px}
+#app.classic .viewbtn,#app.classic .viewbtn.textwide{width:52px;height:26px;padding:2px}
+#app.classic .viewopts{grid-column:1;grid-row:2;display:grid;grid-template-columns:repeat(3,52px) 56px;gap:2px;width:214px;font-size:9px}.ui-classic .squarebtn{height:22px;background:#c0c0c0;border:2px solid;border-color:#fff #404040 #404040 #fff;border-radius:0}
+#app.classic .viewopts label{gap:1px;justify-content:flex-start}
+#app.classic .viewopts input{margin:0 1px 0 0}
+#app.classic .bgctl{grid-column:1;grid-row:3;height:24px;font-size:9px;gap:4px}
+#app.classic .bgctl input[type=color]{width:44px;height:24px}
+
+@media(max-width:1100px){#app:not(.classic){grid-template-rows:30px 138px minmax(0,1fr) 24px}.ribbon{overflow-x:auto}}
+#app.classic .ribbonwrap.classic-overflow{overflow-y:scroll;overflow-x:hidden}#app.classic .ribbonwrap.classic-overflow .ribbon{width:220px;min-height:max-content;padding-bottom:12px}#app.classic .ribbonwrap.classic-overflow .group{width:214px}#app.classic .ribbonwrap:not(.classic-overflow){overflow:hidden}#app.classic .ribbonwrap:not(.classic-overflow) .ribbon{width:100%}
+
+@media print{.titlebar,.ribbonwrap,.statusbar,.rulerCorner,.hruler,.vruler{display:none!important}#app,#app.classic{display:block;background:#fff}.workspace,#app.classic .workspace{display:block;background:#fff}.scroller{padding:0;overflow:visible}.canvasWrap{box-shadow:none;transform:none!important}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="titlebar">
+    <div class="appmark">&#x25A6;</div>
+    <button class="filebtn" id="fileBtn" title="File menu">File</button>
+    <div class="title" id="docTitle">untitled - GlyphPoint</div>
+    <div class="quick">
+      <button id="qUndo" title="Undo (Ctrl+Z)" aria-label="Undo">&#x21B6;</button>
+      <button id="qRedo" title="Redo (Ctrl+Y)" aria-label="Redo">&#x21B7;</button>
+      <button id="uiModeToggle" class="modeToggle" title="Switch between ribbon and classic side-panel interfaces"><span id="uiModeIcon">&#x25EB;</span><span id="uiModeLabel">Classic</span></button>
+    </div>
+  </div>
+
+  <div class="ribbonwrap">
+    <div class="ribbon homeRibbon" id="homeRibbon">
+      <section class="group grp-tools">
+        <div class="toolgrid">
+          <button class="toolbtn active" data-tool="pencil" title="Pencil"><svg viewBox="0 0 16 16"><path d="m3 12 1-4 7-7 3 3-7 7-4 1Z"/><path d="m9.5 2.5 3 3M4 8l4 4"/></svg></button>
+          <button class="toolbtn" data-tool="fill" title="Flood fill"><svg viewBox="0 0 16 16"><path d="m2 8 5-5 5 5-5 5-5-5Z"/><path d="M4 6h6M13 8.5s-2 2.2-2 3.5a2 2 0 0 0 4 0c0-1.3-2-3.5-2-3.5Z"/></svg></button>
+          <button class="toolbtn" data-tool="text" title="Text"><svg viewBox="0 0 16 16"><path d="M3 3h10M8 3v10M5 13h6"/></svg></button>
+          <button class="toolbtn" data-tool="eraser" title="Eraser"><svg viewBox="0 0 16 16"><path d="m2 10 6-7 6 5-5 5H5l-3-3Z"/><path d="M7 13h7"/></svg></button>
+          <button class="toolbtn" data-tool="picker" title="Pick glyph from field"><svg viewBox="0 0 16 16"><path d="m10 2 4 4-7.5 7.5H3v-3.5L10 2Z"/><path d="M8.5 3.5 12.5 7.5M2 14h5"/></svg></button>
+          <button class="toolbtn" data-tool="magnifier" title="Magnifier"><svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 4 4M7 4.5v5M4.5 7h5"/></svg></button>
+        </div>
+      </section>
+
+      <section class="group grp-glyph">
+        <div class="glyphstack">
+          <div class="gp-top">
+            <div class="gp-slots">
+              <div class="gp-slot" title="Primary glyph — left mouse"><span class="gp-slot-label">1</span><span class="gp-slot-char" id="slotPrimaryChar">#</span></div>
+              <div class="gp-slot" title="Secondary glyph — right mouse"><span class="gp-slot-label">2</span><span class="gp-slot-char" id="slotSecondaryChar">+</span></div>
+            </div>
+            <div class="gp-grid" id="glyphPalette"></div>
+          </div>
+          <div class="gp-ctrl">
+            <button id="gpEditBtn" title="Edit palette. Changes are saved locally in this browser.">Edit</button>
+            <button id="gpResetBtn" title="Restore the default palette" hidden>Reset</button>
+            <button id="gpColoursBtn" title="Open the Glyph Colour Manager">Colours&hellip;</button>
+            <span class="grow"></span>
+            <label class="palette-bgctl" title="Canvas background colour">Background <input type="color" id="fieldBgInput" value="#000000"></label>
+            <span class="gp-edit-hint" id="gpEditHint" hidden>click=edit · right-click=remove</span>
+            <button id="gpBgBtn" title="Toggle palette tile contrast">&#x25D0;</button>
+          </div>
+          <div class="brushrow">
+            <label for="brushSize">Size</label><input id="brushSize" type="number" min="1" max="60" step="1" value="1" list="brushSizeOptions" title="Choose a common size or enter 1–60"><datalist id="brushSizeOptions"><option value="1"><option value="2"><option value="3"><option value="4"><option value="5"><option value="6"><option value="7"><option value="8"><option value="9"><option value="10"><option value="12"><option value="16"><option value="20"></datalist>
+            <span class="brushshape"><span class="brushshape-label">Tip</span><button class="bsbtn" data-bs="circle" title="Circular brush">&#x25CB;</button><button class="bsbtn active" data-bs="square" title="Square brush">&#x25A1;</button><button class="bsbtn ratio" data-bs="rect31" title="3:1 rectangular brush"><span class="ratio-shape horizontal short"></span></button><button class="bsbtn ratio" data-bs="rect51" title="5:1 rectangular brush"><span class="ratio-shape horizontal long"></span></button><button class="bsbtn ratio" data-bs="rect13" title="1:3 rectangular brush"><span class="ratio-shape vertical short"></span></button><button class="bsbtn ratio" data-bs="rect15" title="1:5 rectangular brush"><span class="ratio-shape vertical long"></span></button></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="group grp-shapes">
+        <div class="shapegrid" id="shapeGrid"></div>
+        <div class="options">
+          <label>Stroke</label><select id="outlineMode"><option value="rough" selected>Glyph</option><option value="solid">Lines</option><option value="none">None</option></select>
+          <label>Fill</label><select id="fillMode"><option value="none">None</option><option value="glyph">Primary</option><option value="secondary">Secondary</option></select>
+          <label>Width</label><select id="shapeSize"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select>
+        </div>
+      </section>
+
+      <section class="group grp-clipboard">
+        <div class="iconrow">
+          <button class="smallbtn iconbtn" id="copyBtn" title="Copy selection (Ctrl+C)" aria-label="Copy selection"><svg viewBox="0 0 16 16"><rect x="5" y="5" width="8" height="8"/><path d="M3 11H2.5A1.5 1.5 0 0 1 1 9.5v-7A1.5 1.5 0 0 1 2.5 1h7A1.5 1.5 0 0 1 11 2.5V3"/></svg></button>
+          <button class="smallbtn iconbtn" id="cutBtn" title="Cut selection (Ctrl+X)" aria-label="Cut selection"><svg viewBox="0 0 16 16"><circle cx="4" cy="4" r="2"/><circle cx="4" cy="12" r="2"/><path d="M5.5 5.5 13 13M5.5 10.5 13 3"/></svg></button>
+          <button class="smallbtn iconbtn" id="pasteBtn" title="Paste (Ctrl+V)" aria-label="Paste"><svg viewBox="0 0 16 16"><path d="M5 3h6v2H5z"/><path d="M4 4H2.5A1.5 1.5 0 0 0 1 5.5v8A1.5 1.5 0 0 0 2.5 15h9a1.5 1.5 0 0 0 1.5-1.5V6"/><path d="M7 8h7v6H7z"/></svg></button>
+        </div>
+      </section>
+
+      <section class="group grp-selection">
+        <button id="selectBtn" title="Selection tool"><svg viewBox="0 0 16 16"><path stroke-dasharray="2 2" d="M2 2h12v12H2z"/></svg><span>Select</span></button>
+        <div class="smallcol">
+          <select id="selectMode" title="Selection geometry"><option value="rect">Rectangular selection</option><option value="free">Free-form selection</option></select>
+          <div class="sel-grid">
+            <button class="smallbtn" id="selectAllBtn" title="Select entire field">All</button>
+            <button class="smallbtn" id="cropBtn" title="Crop field to selection">Crop</button>
+            <button class="smallbtn" id="deleteBtn" title="Clear selected cells">Clear</button>
+            <button class="smallbtn" id="resizeBtn" title="Resize or skew field">Resize</button>
+          </div>
+          <label class="sel-chk" title="When moving or pasting, skip blank cells"><input id="transparentRibbon" type="checkbox" checked> Ignore blanks</label>
+        </div>
+      </section>
+
+      <section class="group grp-transform">
+        <div class="transformgrid">
+          <button class="xformbtn rotbtn" data-transform="rot90" title="Rotate 90 degrees clockwise" aria-label="Rotate 90 degrees clockwise">&#x21BB;</button>
+          <button class="xformbtn rotbtn" data-transform="rot270" title="Rotate 90 degrees anticlockwise" aria-label="Rotate 90 degrees anticlockwise">&#x21BA;</button>
+          <button class="xformbtn" data-transform="rot180" title="Rotate 180 degrees">180&deg;</button>
+          <button class="xformbtn" data-transform="flipH" title="Mirror horizontally">&#x21C6;</button>
+          <button class="xformbtn" data-transform="flipV" title="Mirror vertically">&#x21C5;</button>
+        </div>
+      </section>
+
+      <section class="group grp-view">
+        <div class="viewcompact">
+          <div class="viewbuttons">
+            <button class="viewbtn" id="zoomIn" title="Zoom in" aria-label="Zoom in">+</button>
+            <button class="viewbtn" id="zoomOut" title="Zoom out" aria-label="Zoom out">&minus;</button>
+            <button class="viewbtn textwide" id="zoom100" title="Reset zoom to 100%">1:1</button>
+            <button class="viewbtn" id="fullscreen" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 16 16"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg></button>
+          </div>
+          <div class="viewopts">
+            <label><input type="checkbox" id="gridToggle" checked> Grid</label>
+            <label><input type="checkbox" id="rulerToggle" checked> Rulers</label>
+            <label><input type="checkbox" id="statusToggle" checked> Status</label>
+            <button class="squarebtn" id="squareToggle" type="button" aria-pressed="false" title="Toggle square pixels">Square pixels</button>
+          </div>
+          
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="workspace" id="workspace">
+    <div class="rulerCorner"></div><div class="hruler" id="hruler"></div><div class="vruler" id="vruler"></div>
+    <div class="scroller" id="scroller"><div class="canvasWrap" id="canvasWrap"><div id="canvasGrid" aria-label="Glyph painting canvas"></div></div></div>
+  </div>
+
+  <div class="statusbar" id="statusbar"><span id="cursorStat">0, 0</span><span id="selectStat"></span><span id="sizeStat">80 &times; 80 cells</span><span class="grow" id="msgStat">Ready</span><div class="zoomCtl"><button id="zminus">&minus;</button><input id="zoomSlider" type="range" min="25" max="800" value="100" step="25"><button id="zplus">+</button><span id="zoomLabel">100%</span></div></div>
+</div>
+
+<div class="dropdown" id="fileMenu">
+  <button data-file="new">New <span style="float:right" class="kbd">Ctrl+N</span></button>
+  <button data-file="openProject">Open GlyphPoint project&hellip;</button>
+  <button data-file="openTxt">Open plain text&hellip;</button>
+  <button data-file="openHtml">Open coloured HTML&hellip;</button>
+  <hr>
+  <button data-file="saveProject">Save project <span style="float:right" class="kbd">Ctrl+S</span></button>
+  <button data-file="exportTxt">Export plain text&hellip;</button>
+  <button data-file="exportHtml">Export standalone HTML&hellip;</button>
+  <hr>
+  <button data-file="properties">Properties</button>
+  <button data-file="colourManager">Glyph Colour Manager&hellip;</button>
+  <button data-file="print">Print&hellip; <span style="float:right" class="kbd">Ctrl+P</span></button>
+  <button data-file="help">Help / shortcuts</button>
+</div>
+
+<div class="cpick" id="colorPicker" hidden>
+  <div class="cpick-head">
+    <span class="cpick-swatch" id="cpickSwatch"></span>
+    <input class="cpick-hex" id="cpickHexInput" value="#808080" spellcheck="false" title="Hex colour">
+  </div>
+  <label><span>Hue</span><input type="range" id="cpickH" min="0" max="360" value="0" step="any"></label>
+  <label><span>Saturation</span><input type="range" id="cpickSat" min="0" max="255" value="128" step="any"></label>
+  <label><span>Luminosity</span><input type="range" id="cpickL" min="0" max="255" value="128" step="any"></label>
+  <div class="cpick-presets" id="cpickPresets"></div>
+</div>
+
+<input type="file" id="openProjectInput" accept=".json,.glyphpoint.json,application/json" hidden>
+<input type="file" id="openTxtInput" accept=".txt,text/plain" hidden>
+<input type="file" id="openHtmlInput" accept=".html,.htm,text/html" hidden>
+
+<dialog id="resizeDialog">
+  <div class="dlgTitle">Resize and Skew</div><div class="dlgBody">
+    <div class="dlgGrid">
+      <label>Resize by</label><select id="resizeUnit"><option value="pixels">Cells</option><option value="percent">Percentage</option></select>
+      <label>Horizontal</label><input type="number" id="resizeW" min="1" value="80">
+      <label>Vertical</label><input type="number" id="resizeH" min="1" value="80">
+      <label>Maintain aspect ratio</label><input type="checkbox" id="keepAspect" checked>
+      <label>Skew horizontal (&deg;)</label><input type="number" id="skewX" min="-89" max="89" value="0">
+      <label>Skew vertical (&deg;)</label><input type="number" id="skewY" min="-89" max="89" value="0">
+    </div>
+  </div><div class="dlgActions"><button value="cancel">Cancel</button><button id="applyResize" value="default">OK</button></div>
+</dialog>
+
+<dialog id="textDialog">
+  <div class="dlgTitle">Text</div><div class="dlgBody">
+    <textarea id="textValue" class="textArea" placeholder="Type text&hellip;"></textarea>
+    <div class="dlgGrid" style="margin-top:10px">
+      <label>Font</label><select id="textFont"><option>Cascadia Mono</option><option>Consolas</option><option>Courier New</option><option>monospace</option></select>
+      <label>Scale</label><select id="textScale"><option value="1">1&times;</option><option value="2">2&times;</option><option value="3">3&times;</option></select>
+      <label>Style</label><div><label><input type="checkbox" id="textBold"> Bold</label> <label><input type="checkbox" id="textItalic"> Italic</label> <label><input type="checkbox" id="textUnderline"> Underline</label></div>
+      <label>Background</label><select id="textBg"><option value="transparent">Transparent</option><option value="opaque">Opaque</option></select>
+    </div>
+  </div><div class="dlgActions"><button value="cancel">Cancel</button><button id="applyText" value="default">Place text</button></div>
+</dialog>
+
+<dialog id="propertiesDialog">
+  <div class="dlgTitle">Image Properties</div><div class="dlgBody"><div class="dlgGrid">
+    <label>Width (cells)</label><input type="number" id="propW" min="1">
+    <label>Height (cells)</label><input type="number" id="propH" min="1">
+    <label>Field background</label><input type="color" id="propBg">
+    <label>Glyphs only</label><input type="checkbox" id="transparentSelect">
+  </div></div><div class="dlgActions"><button value="cancel">Cancel</button><button id="applyProps">OK</button></div>
+</dialog>
+
+
+<dialog id="paletteDialog">
+  <div class="dlgTitle" id="paletteDlgTitle">Palette glyph</div>
+  <div class="dlgBody">
+    <div class="paletteEditRow"><label for="paletteGlyphInput">Glyph</label><input id="paletteGlyphInput" maxlength="2" autocomplete="off" spellcheck="false"><label for="paletteColourInput">Colour</label><input id="paletteColourInput" type="color" value="#ffffff"></div>
+    <div class="dialogHint">Enter one Unicode character and choose its colour. Palette edits are saved locally and reused the next time GlyphPoint opens.</div>
+  </div>
+  <div class="dlgActions"><button id="paletteRemoveBtn" class="danger">Remove</button><span class="grow"></span><button value="cancel">Cancel</button><button id="paletteApplyBtn">Save</button></div>
+</dialog>
+
+<dialog id="glyphColourManagerDialog" class="gcm-dialog">
+  <div class="gcm-titlebar">
+    <button class="gcm-menubtn" id="gcmFileBtn">File ▾</button>
+    <button class="gcm-menubtn" id="gcmThemeBtn">Colourway ▾</button>
+    <span class="gcm-titletext">Glyph Colour Manager</span>
+    <button class="gcm-closex" id="gcmCloseX" title="Close" aria-label="Close">×</button>
+  </div>
+  <div class="gcm-menu" id="gcmFileMenu">
+    <button data-gcm-file="import">Import palette or project…</button>
+    <button data-gcm-file="export">Export palette…</button>
+  </div>
+  <div class="gcm-menu" id="gcmThemeMenu"></div>
+  <div class="dlgBody">
+    <div class="gcm-toolbar">
+      <input id="gcmSearch" type="search" placeholder="Search glyphs, labels or hex colours" aria-label="Search glyph colours">
+      <select id="gcmSort" aria-label="Sort glyph colours"><option value="order">Palette order</option><option value="glyph">Glyph</option><option value="colour">Colour</option><option value="usage">Usage</option><option value="represents">Represents</option></select>
+    </div>
+    <div class="gcm-list" id="gcmList"></div><div class="gcm-status" id="gcmStatus"></div>
+  </div>
+  <div class="dlgActions"><button id="gcmAdd">Add glyph</button><button id="gcmResetAll">Reset all colours</button><button id="gcmRevert">Revert changes</button><span class="gcm-spacer"></span><button id="gcmClose">Close</button></div>
+</dialog>
+<input type="file" id="gcmImportInput" accept=".json,.glyphpoint.json,application/json" hidden>
+<dialog id="helpDialog"><div class="dlgTitle">GlyphPoint help</div><div class="dlgBody helpcols" id="helpBody"></div><div class="dlgActions"><button value="cancel">Close</button></div></dialog>
+
+<script>
+'use strict';
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const deepCell = c => ({...c});
+const makeCell=(ch=' ')=>({ch,fg:'',bg:'',font:'Cascadia Mono',bold:false,italic:false,underline:false});
+let hoveredCells=[];
+
+const DEFAULT_GLYPH_CHARS=['#','.','+','~','*','X','O','@',' ','=','-','|','>','<','^','o','x'];
+const DEFAULT_GLYPH_COLOURS=['#a8e6a3','#88d8c0','#7fd4d4','#9ed9e0','#f6b5c4','#e6a8d7','#c0a8e6','#b8a6f5'];
+const DEFAULT_GLYPH_PALETTE=DEFAULT_GLYPH_CHARS.map(glyph=>({glyph,colour:DEFAULT_GLYPH_COLOURS[glyph.codePointAt(0)%DEFAULT_GLYPH_COLOURS.length]}));
+const PREFS_KEY='glyphpoint.palette.v3';
+const LEGACY_PREFS_KEY='glyphpoint.palette.v2';
+const UI_MODE_KEY='glyphpoint.uiMode.v1';
+
+const state={
+  cols:80,rows:80,cells:[],tool:'pencil',shape:'line',
+  fieldBg:'#000000',brushSize:1,shapeSize:1,brushShape:'square',
+  outlineMode:'rough',fillMode:'none',shiftHeld:false,zoom:1,grid:true,rulers:true,status:true,square:false,
+  transparentSelect:true,selection:null,clipboard:null,history:[],future:[],drawing:false,
+  actionStart:null,lastCell:null,freePath:[],preview:new Set(),textAnchor:null,docName:'untitled',dirty:false,els:[],
+  glyphCounts:{},glyphPalette:DEFAULT_GLYPH_PALETTE.map(e=>({...e})),
+  paletteEditing:false,paletteEditIndex:null,paletteBgMode:'grey',glyphPrimary:'#',glyphSecondary:'+',drawGlyph:'#',knownGlyphs:new Set(),uiMode:'ribbon'
+};
+
+const SHAPES=[
+  ['line','\u2571'],['rect','\u25A1'],['ellipse','\u25CB'],['triangle','\u25B3'],
+  ['rightTri','\u25FF'],['diamond','\u25C7'],['arrowR','\u2192'],['arrowL','\u2190'],['arrowU','\u2191'],
+  ['arrowD','\u2193'],['slash','/'],['bslash','\\']
+];
+const BRUSH_RATIOS={rect13:[1,3],rect31:[3,1],rect15:[1,5],rect51:[5,1]};
+
+function init(){
+  loadLocalPrefs();
+  newDocument(80,80,false);
+  buildShapes();bindUI();setUiMode(state.uiMode,false);setZoom(1);setTool('pencil');renderRulers();setMessage('Ready');
+  buildGlyphPalette();buildColourPresets();
+  state.grid=true;$('#canvasGrid').classList.add('gridlines');$('#gridToggle').checked=true;
+  $('#fieldBgInput').value=state.fieldBg;$('#squareToggle').setAttribute('aria-pressed',state.square);
+}
+function safeStorageGet(key){try{return localStorage.getItem(key)}catch{return null}}
+function safeStorageSet(key,value){try{localStorage.setItem(key,value);return true}catch{return false}}
+function validColour(v){return /^#[0-9a-f]{6}$/i.test(String(v||''))}
+function normalisePalette(list,legacyColours={}){
+  const out=[],seen=new Set();
+  for(const raw of Array.isArray(list)?list:[]){
+    const source=raw&&typeof raw==='object'?raw:{};
+    const glyph=[...String(source.glyph??raw??'')][0];
+    if(glyph===undefined||seen.has(glyph))continue;
+    const fallback=legacyColours[glyph]||defaultColourForGlyph(glyph);
+    out.push({glyph,colour:validColour(source.colour)?source.colour.toLowerCase():fallback,represents:typeof source.represents==='string'?source.represents.slice(0,80):''});seen.add(glyph);
+    if(out.length>=72)break;
+  }
+  return out;
+}
+function paletteEntry(ch){return state.glyphPalette.find(e=>e.glyph===ch)||null}
+function defaultColourForGlyph(ch){return DEFAULT_GLYPH_PALETTE.find(e=>e.glyph===ch)?.colour||'#ffffff'}
+function getGlyphColour(ch){return /^\s$/u.test(ch||'')?state.fieldBg:(paletteEntry(ch)?.colour||'#ffffff')}
+function refreshGlyphColourUI(){renderAll();buildGlyphPalette();buildGlyphColourPanel()}
+function setGlyphColour(ch,colour,{persist=true,refresh=true}={}){
+  let entry=paletteEntry(ch);if(!entry){entry={glyph:ch,colour:'#ffffff',represents:''};state.glyphPalette.push(entry)}
+  entry.colour=validColour(colour)?colour.toLowerCase():'#ffffff';
+  if(persist)savePalettePrefs();if(refresh)refreshGlyphColourUI();return entry.colour;
+}
+function ensureGlyphEntry(ch,colour='#ffffff'){if(ch===undefined||paletteEntry(ch))return false;state.glyphPalette.push({glyph:ch,colour:validColour(colour)?colour.toLowerCase():'#ffffff',represents:''});return true}
+function loadLocalPrefs(){
+  try{const raw=safeStorageGet(PREFS_KEY)||safeStorageGet(LEGACY_PREFS_KEY);if(raw){const p=JSON.parse(raw),pal=normalisePalette(p.palette,p.glyphColours||{});if(pal.length)state.glyphPalette=pal;if(typeof p.primary==='string')state.glyphPrimary=[...p.primary][0]??'#';if(typeof p.secondary==='string')state.glyphSecondary=[...p.secondary][0]??'+';if(p.bgMode==='grey'||p.bgMode==='invert')state.paletteBgMode=p.bgMode}}
+  catch{}
+  const mode=safeStorageGet(UI_MODE_KEY);if(mode==='classic'||mode==='ribbon')state.uiMode=mode;
+  const glyphs=state.glyphPalette.map(e=>e.glyph);
+  if(!glyphs.includes(state.glyphPrimary))state.glyphPrimary=glyphs[0]??'#';
+  if(!glyphs.includes(state.glyphSecondary))state.glyphSecondary=glyphs[1]??state.glyphPrimary;
+  state.drawGlyph=state.glyphPrimary;
+}
+function savePalettePrefs(){safeStorageSet(PREFS_KEY,JSON.stringify({palette:state.glyphPalette,primary:state.glyphPrimary,secondary:state.glyphSecondary,bgMode:state.paletteBgMode}))}
+function updateClassicOverflow(){
+  const wrap=document.querySelector('#app.classic .ribbonwrap'),ribbon=document.querySelector('#app.classic .ribbon');
+  if(!wrap||!ribbon)return;
+  wrap.classList.remove('classic-overflow');
+  requestAnimationFrame(()=>{const needs=ribbon.scrollHeight>wrap.clientHeight+1;wrap.classList.toggle('classic-overflow',needs)});
+}
+function setUiMode(mode,persist=true){
+  state.uiMode=mode==='classic'?'classic':'ribbon';
+  const classic=state.uiMode==='classic',app=$('#app');app.classList.toggle('classic',classic);document.body.classList.toggle('ui-classic',classic);
+  const label=$('#uiModeLabel'),icon=$('#uiModeIcon');if(label)label.textContent=classic?'Ribbon':'Classic';if(icon)icon.textContent=classic?'▰':'◫';
+  $('#uiModeToggle')?.setAttribute('title',classic?'Switch to compact ribbon interface':'Switch to Win98-style side-panel interface');
+  if(persist)safeStorageSet(UI_MODE_KEY,state.uiMode);
+  requestAnimationFrame(()=>{renderRulers();setZoom(state.zoom);updateClassicOverflow()});
+}
+
+function newDocument(cols=80,rows=80,push=true){
+  if(push) snapshot();state.cols=cols;state.rows=rows;state.cells=Array.from({length:cols*rows},()=>makeCell(' '));
+  state.selection=null;state.preview.clear();state.docName='untitled';state.dirty=false;rebuildGrid();updateTitle();
+}
+function idx(x,y){return y*state.cols+x} function xy(i){return [i%state.cols,Math.floor(i/state.cols)]}
+function inBounds(x,y){return x>=0&&y>=0&&x<state.cols&&y<state.rows}
+function getCell(x,y){return inBounds(x,y)?state.cells[idx(x,y)]:null}
+function setCell(x,y,patch){if(!inBounds(x,y))return;const i=idx(x,y),prev=state.cells[i].ch;if(prev!==patch.ch){if(state.glyphCounts[prev]>0)state.glyphCounts[prev]--;state.glyphCounts[patch.ch]=(state.glyphCounts[patch.ch]||0)+1;}Object.assign(state.cells[i],patch);renderCellIndex(i);autoAddGlyph(patch.ch);state.dirty=true}
+function rebuildGrid(){
+  const g=$('#canvasGrid');g.innerHTML='';g.style.gridTemplateColumns=state.square?`repeat(${state.cols},1em)`:`repeat(${state.cols},1ch)`;
+  g.classList.toggle('squarecells',state.square);
+  state.els=[];
+  const frag=document.createDocumentFragment();
+  for(let i=0;i<state.cells.length;i++){const s=document.createElement('span');s.className='cell';s.dataset.i=i;state.els.push(s);frag.appendChild(s)}g.appendChild(frag);
+  state.knownGlyphs=new Set(state.cells.map(c=>c.ch));
+  state.glyphCounts={};let paletteChanged=false;for(const c of state.cells){state.glyphCounts[c.ch]=(state.glyphCounts[c.ch]||0)+1;paletteChanged=ensureGlyphEntry(c.ch)||paletteChanged}
+  if(paletteChanged)savePalettePrefs();
+  renderAll();updateStats();renderRulers();buildGlyphPalette();buildGlyphColourPanel();
+}
+function renderAll(){for(let i=0;i<state.cells.length;i++)renderCellIndex(i);renderSelection();renderPreview()}
+function renderCell(x,y){renderCellIndex(idx(x,y))}
+function renderCellIndex(i){
+  const el=state.els[i];if(!el)return;const c=state.cells[i];
+  const bg=state.fieldBg||'#000000';
+  const fg=getGlyphColour(c.ch)
+  el.textContent=c.ch==='\u00a0'||c.ch===' '? '\u00a0':c.ch;el.style.color=fg;el.style.backgroundColor=bg;el.style.fontFamily=`"${c.font}",monospace`;el.style.fontWeight=c.bold?'700':'400';el.style.fontStyle=c.italic?'italic':'normal';el.style.textDecoration=c.underline?'underline':'none';
+}
+function resolveGlyphColour(ch){return{fg:getGlyphColour(ch),bg:state.fieldBg||'#000000'}}
+function glyphFg(ch){return resolveGlyphColour(ch).fg}
+function hexRgb(hex){const m=/^#?([0-9a-f]{6})$/i.exec(hex||'');if(!m)return null;const n=parseInt(m[1],16);return{r:n>>16&255,g:n>>8&255,b:n&255}}
+function invertHex(hex){const c=hexRgb(hex);if(!c)return '#000000';return '#'+[255-c.r,255-c.g,255-c.b].map(v=>v.toString(16).padStart(2,'0')).join('')}
+function lumHex(hex){const c=hexRgb(hex);if(!c)return 0;return 0.299*c.r+0.587*c.g+0.114*c.b}
+function paletteContrast(col){
+  if(state.paletteBgMode==='grey')return Math.round(lumHex(col))>=128?'#000000':'#ffffff';
+  return invertHex(col);
+}
+function autoAddGlyph(ch){
+  if(!ch)return;
+  if(!state.knownGlyphs.has(ch)){
+    state.knownGlyphs.add(ch);
+    if(ensureGlyphEntry(ch)){savePalettePrefs();buildGlyphPalette()}
+    buildGlyphColourPanel();
+    return;
+  }
+  const rows=$$('.gc-row');
+  for(const row of rows)if(row.querySelector('.gc-ch').textContent===displayGlyph(ch)){
+    row.querySelector('.gc-count').textContent=state.glyphCounts[ch]||0;break;
+  }
+}
+function displayGlyph(ch){return ch===' '?'\u2423':ch}
+function updateStats(){ $('#sizeStat').textContent=`${state.cols} \u00D7 ${state.rows} cells`; if(state.selection){const s=selectionBounds();$('#selectStat').textContent=`${s.w} \u00D7 ${s.h} selected`}else $('#selectStat').textContent=''; }
+function updateTitle(){ $('#docTitle').textContent=`${state.dirty?'*':''}${state.docName} - GlyphPoint` }
+function markDirty(){state.dirty=true;updateTitle()}
+function setMessage(s){$('#msgStat').textContent=s}
+
+function snapshot(){
+  state.history.push({cols:state.cols,rows:state.rows,cells:state.cells.map(deepCell),selection:state.selection?JSON.parse(JSON.stringify(state.selection)):null,glyphPalette:state.glyphPalette.map(e=>({...e}))});
+  if(state.history.length>60)state.history.shift();state.future.length=0;
+}
+function restore(s){state.cols=s.cols;state.rows=s.rows;state.cells=s.cells.map(deepCell);state.selection=s.selection?JSON.parse(JSON.stringify(s.selection)):null;if(s.glyphPalette)state.glyphPalette=normalisePalette(s.glyphPalette);rebuildGrid();markDirty()}
+function undo(){if(!state.history.length)return;state.future.push({cols:state.cols,rows:state.rows,cells:state.cells.map(deepCell),selection:state.selection?JSON.parse(JSON.stringify(state.selection)):null,glyphPalette:state.glyphPalette.map(e=>({...e}))});restore(state.history.pop());setMessage('Undo')}
+function redo(){if(!state.future.length)return;state.history.push({cols:state.cols,rows:state.rows,cells:state.cells.map(deepCell),selection:state.selection?JSON.parse(JSON.stringify(state.selection)):null,glyphPalette:state.glyphPalette.map(e=>({...e}))});restore(state.future.pop());setMessage('Redo')}
+
+
+let gcmOpeningSnapshot=null;
+const GCM_COLOURWAYS={
+  'Pastel':DEFAULT_GLYPH_COLOURS,
+  'Neon':['#00ffff','#ff00ff','#ffff00','#00ff66','#ff6600','#6699ff','#ff3366','#99ff00'],
+  'Ocean':['#003f5c','#2f4b7c','#665191','#a05195','#d45087','#f95d6a','#ff7c43','#ffa600'],
+  'Forest':['#16302b','#22543d','#2f855a','#48bb78','#68d391','#9ae6b4','#d69e2e','#975a16'],
+  'Monochrome':['#ffffff','#dddddd','#bbbbbb','#999999','#777777','#555555','#333333','#111111'],
+  'High contrast':['#ffffff','#ffff00','#00ffff','#ff00ff','#00ff00','#ff0000','#0080ff','#ff8000']
+};
+function isWhitespaceGlyph(ch){return /^\s$/u.test(ch||'')}
+function getGlyphManagerRows(){
+  const q=($('#gcmSearch')?.value||'').trim().toLowerCase(),sort=$('#gcmSort')?.value||'order';
+  let rows=state.glyphPalette.map((entry,index)=>({entry,index,usage:state.glyphCounts[entry.glyph]||0})).filter(x=>!isWhitespaceGlyph(x.entry.glyph));
+  if(q)rows=rows.filter(({entry})=>entry.glyph.toLowerCase().includes(q)||entry.colour.toLowerCase().includes(q)||(entry.represents||'').toLowerCase().includes(q));
+  if(sort==='glyph')rows.sort((a,b)=>a.entry.glyph.localeCompare(b.entry.glyph));else if(sort==='colour')rows.sort((a,b)=>a.entry.colour.localeCompare(b.entry.colour));else if(sort==='usage')rows.sort((a,b)=>b.usage-a.usage||a.index-b.index);else if(sort==='represents')rows.sort((a,b)=>(a.entry.represents||'').localeCompare(b.entry.represents||''));return rows;
+}
+function setGcmStatus(message){const el=$('#gcmStatus');if(el)el.textContent=message}
+function replacePaletteGlyph(oldGlyph,newGlyph){
+  newGlyph=[...String(newGlyph||'')][0];if(!newGlyph||isWhitespaceGlyph(newGlyph))return{ok:false,message:'Enter one non-whitespace glyph'};
+  if(newGlyph!==oldGlyph&&paletteEntry(newGlyph))return{ok:false,message:'That glyph is already in the palette'};
+  const entry=paletteEntry(oldGlyph);if(!entry)return{ok:false,message:'Glyph not found'};entry.glyph=newGlyph;
+  for(const c of state.cells)if(c.ch===oldGlyph)c.ch=newGlyph;
+  if(state.glyphPrimary===oldGlyph)state.glyphPrimary=newGlyph;if(state.glyphSecondary===oldGlyph)state.glyphSecondary=newGlyph;if(state.drawGlyph===oldGlyph)state.drawGlyph=newGlyph;
+  state.knownGlyphs.delete(oldGlyph);state.knownGlyphs.add(newGlyph);savePalettePrefs();rebuildGrid();return{ok:true};
+}
+function renderGlyphColourManager(){
+  const list=$('#gcmList');if(!list)return;list.replaceChildren();const head=document.createElement('div');head.className='gcm-head';['Glyph','Colour','Hex','Uses','Represents','Actions'].forEach(t=>{const x=document.createElement('span');x.textContent=t;head.appendChild(x)});list.appendChild(head);
+  const rows=getGlyphManagerRows();if(!rows.length){const x=document.createElement('div');x.className='gcm-empty';x.textContent='No glyphs match the current filter.';list.appendChild(x);setGcmStatus('0 glyphs shown');return}
+  for(const {entry,usage} of rows){
+    const row=document.createElement('div');row.className='gcm-row';
+    const glyph=document.createElement('input');glyph.className='gcm-glyph';glyph.value=entry.glyph;glyph.maxLength=2;glyph.spellcheck=false;glyph.title='Replace this glyph everywhere in the palette and canvas';
+    const colour=document.createElement('input');colour.type='color';colour.className='gcm-colour';colour.value=entry.colour;
+    const hex=document.createElement('input');hex.className='gcm-hex';hex.value=entry.colour.toUpperCase();hex.maxLength=7;hex.spellcheck=false;hex.size=8;
+    const uses=document.createElement('span');uses.textContent=String(usage);
+    const represents=document.createElement('input');represents.className='gcm-represents';represents.value=entry.represents||'';represents.maxLength=80;represents.placeholder='Label…';
+    const actions=document.createElement('span');actions.className='gcm-actions';const reset=document.createElement('button');reset.textContent='Reset';const remove=document.createElement('button');remove.textContent='Remove';remove.disabled=state.glyphPalette.filter(e=>!isWhitespaceGlyph(e.glyph)).length<=1;
+    const commitGlyph=()=>{const next=[...glyph.value][0];const result=replacePaletteGlyph(entry.glyph,next);glyph.classList.toggle('invalid',!result.ok);if(!result.ok){setGcmStatus(result.message);return}renderGlyphColourManager();setGcmStatus(`Replaced ${entry.glyph} with ${next}`)};glyph.onchange=commitGlyph;glyph.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();commitGlyph()}};
+    colour.oninput=()=>{hex.value=colour.value.toUpperCase();setGlyphColour(entry.glyph,colour.value,{persist:false,refresh:false});renderAll();buildGlyphPalette()};colour.onchange=()=>savePalettePrefs();
+    const commitHex=()=>{const v=hex.value.trim();if(!validColour(v)){hex.classList.add('invalid');setGcmStatus('Enter a six-digit hex colour');return}hex.classList.remove('invalid');colour.value=v;setGlyphColour(entry.glyph,v);hex.value=v.toUpperCase()};hex.onchange=commitHex;hex.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();commitHex()}};
+    represents.onchange=()=>{entry.represents=represents.value.trim().slice(0,80);savePalettePrefs();setGcmStatus(`Saved label for ${entry.glyph}`)};
+    reset.onclick=()=>{setGlyphColour(entry.glyph,defaultColourForGlyph(entry.glyph));renderGlyphColourManager()};remove.onclick=()=>{removePaletteGlyph(state.glyphPalette.indexOf(entry));renderGlyphColourManager()};actions.append(reset,remove);row.append(glyph,colour,hex,uses,represents,actions);list.appendChild(row);
+  }setGcmStatus(`${rows.length} glyphs shown. Whitespace is managed automatically from the canvas background.`);
+}
+function closeGcmMenus(){ $$('.gcm-menu').forEach(m=>m.classList.remove('open')) }
+function openGcmMenu(button,menu){closeGcmMenus();const r=button.getBoundingClientRect();menu.style.left=r.left+'px';menu.style.top=r.bottom+'px';menu.classList.add('open')}
+function buildGcmThemeMenu(){const menu=$('#gcmThemeMenu');menu.replaceChildren();for(const name of Object.keys(GCM_COLOURWAYS)){const b=document.createElement('button');b.textContent=name;b.onclick=()=>{applyGcmColourway(name);closeGcmMenus()};menu.appendChild(b)}}
+function applyGcmColourway(name){const colours=GCM_COLOURWAYS[name];if(!colours)return;let i=0;for(const entry of state.glyphPalette){if(isWhitespaceGlyph(entry.glyph))continue;entry.colour=colours[i++%colours.length]}savePalettePrefs();refreshGlyphColourUI();renderGlyphColourManager();setGcmStatus(`Applied ${name} colourway`)}
+function openGlyphColourManager(){gcmOpeningSnapshot={palette:state.glyphPalette.map(e=>({...e})),primary:state.glyphPrimary,secondary:state.glyphSecondary};$('#gcmSearch').value='';$('#gcmSort').value='order';buildGcmThemeMenu();renderGlyphColourManager();$('#glyphColourManagerDialog').showModal()}
+function closeGlyphColourManager(){closeGcmMenus();$('#glyphColourManagerDialog').close();gcmOpeningSnapshot=null}
+function addGlyphFromManager(){state.paletteEditIndex=null;$('#paletteDlgTitle').textContent='Add palette glyph';$('#paletteGlyphInput').value='';$('#paletteColourInput').value='#ffffff';$('#paletteRemoveBtn').hidden=true;$('#paletteDialog').showModal();setTimeout(()=>$('#paletteGlyphInput').focus(),0)}
+function resetAllGlyphColours(){if(!confirm('Reset all glyph colours?'))return;for(const e of state.glyphPalette)if(!isWhitespaceGlyph(e.glyph))e.colour=defaultColourForGlyph(e.glyph);savePalettePrefs();refreshGlyphColourUI();renderGlyphColourManager()}
+function revertGlyphManager(){if(!gcmOpeningSnapshot)return;state.glyphPalette=gcmOpeningSnapshot.palette.map(e=>({...e}));state.glyphPrimary=gcmOpeningSnapshot.primary;state.glyphSecondary=gcmOpeningSnapshot.secondary;state.drawGlyph=state.glyphPrimary;savePalettePrefs();refreshGlyphColourUI();renderGlyphColourManager();setGcmStatus('Changes reverted')}
+function exportGlyphPalette(){const payload={format:'glyphpoint-v2',kind:'palette',glyphPalette:state.glyphPalette,glyphPrimary:state.glyphPrimary,glyphSecondary:state.glyphSecondary,fieldBg:state.fieldBg};downloadBlob(JSON.stringify(payload,null,2),'application/json','glyphpoint-palette.json');setGcmStatus('Palette exported')}
+async function importGlyphPaletteFile(e){const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!['glyphpoint-v1','glyphpoint-v2'].includes(d.format)||!Array.isArray(d.glyphPalette))throw Error('No compatible GlyphPoint palette found');const pal=normalisePalette(d.glyphPalette,d.glyphColours||{});if(!pal.length)throw Error('Palette is empty');state.glyphPalette=pal;if(d.glyphPrimary&&paletteEntry(d.glyphPrimary))state.glyphPrimary=d.glyphPrimary;if(d.glyphSecondary&&paletteEntry(d.glyphSecondary))state.glyphSecondary=d.glyphSecondary;if(validColour(d.fieldBg))state.fieldBg=d.fieldBg.toLowerCase();$('#fieldBgInput').value=state.fieldBg;savePalettePrefs();refreshGlyphColourUI();renderGlyphColourManager();setGcmStatus(`Imported palette from ${f.name}`)}catch(err){alert('Could not import palette: '+err.message)}e.target.value=''}
+function buildGlyphPalette(){
+  const grid=$('#glyphPalette');if(!grid)return;grid.innerHTML='';
+  state.glyphPalette.forEach((entry,i)=>{
+    const ch=entry.glyph;
+    const b=document.createElement('button');b.className='gp-btn';b.dataset.g=ch;b.dataset.index=i;
+    b.textContent=displayGlyph(ch);b.title=state.paletteEditing?'Edit this palette glyph; right-click removes it':`Primary: left click · Secondary: right click — ${ch===' '?'space':ch}`;
+    b.style.color=glyphFg(ch);b.style.background=/^\s$/u.test(ch)?state.fieldBg:paletteContrast(glyphFg(ch));
+    if(state.paletteEditing){
+      b.classList.add('editing');
+      b.addEventListener('pointerdown',e=>{e.preventDefault();if(e.button===2){removePaletteGlyph(i);return}openPaletteEditor(i)});
+    }else{
+      b.addEventListener('pointerdown',e=>{e.preventDefault();if(e.button===2)setSecondaryGlyph(ch);else setPrimaryGlyph(ch)});
+    }
+    grid.appendChild(b);
+  });
+  if(state.paletteEditing){const add=document.createElement('button');add.className='gp-btn gp-add';add.textContent='+';add.title='Add glyph to palette';add.onclick=()=>openPaletteEditor(null);grid.appendChild(add)}
+  $$('#glyphPalette .gp-btn[data-g]').forEach(b=>b.classList.toggle('prime',b.dataset.g===state.glyphPrimary));
+  $$('#glyphPalette .gp-btn[data-g]').forEach(b=>b.classList.toggle('sec',b.dataset.g===state.glyphSecondary));
+  const p1=$('#slotPrimaryChar'),p2=$('#slotSecondaryChar');
+  if(p1){p1.textContent=displayGlyph(state.glyphPrimary);p1.style.color=glyphFg(state.glyphPrimary);p1.closest('.gp-slot').style.background=isWhitespaceGlyph(state.glyphPrimary)?state.fieldBg:paletteContrast(glyphFg(state.glyphPrimary))}
+  if(p2){p2.textContent=displayGlyph(state.glyphSecondary);p2.style.color=glyphFg(state.glyphSecondary);p2.closest('.gp-slot').style.background=isWhitespaceGlyph(state.glyphSecondary)?state.fieldBg:paletteContrast(glyphFg(state.glyphSecondary))}
+  const edit=$('#gpEditBtn'),reset=$('#gpResetBtn'),hint=$('#gpEditHint');if(edit){edit.classList.toggle('active',state.paletteEditing);edit.textContent=state.paletteEditing?'Done':'Edit'}if(reset)reset.hidden=!state.paletteEditing;if(hint)hint.hidden=!state.paletteEditing;updateClassicOverflow();
+}
+function setPaletteEditing(on){state.paletteEditing=!!on;buildGlyphPalette();setMessage(state.paletteEditing?'Palette edit mode — click a glyph to replace it; right-click to remove':'Palette edit mode closed')}
+function paletteInputGlyph(){const v=$('#paletteGlyphInput')?.value??'';return [...v][0]}
+function openPaletteEditor(index){
+  state.paletteEditIndex=Number.isInteger(index)?index:null;const dlg=$('#paletteDialog'),input=$('#paletteGlyphInput'),remove=$('#paletteRemoveBtn');
+  const editing=state.paletteEditIndex!==null;const entry=editing?state.glyphPalette[state.paletteEditIndex]:null;$('#paletteDlgTitle').textContent=editing?'Edit palette glyph':'Add palette glyph';input.value=entry?.glyph||'';$('#paletteColourInput').value=entry?.colour||'#ffffff';remove.hidden=!editing;dlg.showModal();setTimeout(()=>{input.focus();input.select()},0)
+}
+function applyPaletteEditor(){
+  const ch=paletteInputGlyph(),colour=$('#paletteColourInput').value;if(ch===undefined){setMessage('Enter one glyph');return}
+  const i=state.paletteEditIndex,duplicate=state.glyphPalette.findIndex(e=>e.glyph===ch);
+  if(i===null){if(duplicate>=0){setMessage('Glyph is already in the palette');return}state.glyphPalette.push({glyph:ch,colour:validColour(colour)?colour:'#ffffff',represents:''})}
+  else{if(duplicate>=0&&duplicate!==i){setMessage('Glyph is already in the palette');return}const old=state.glyphPalette[i].glyph;state.glyphPalette[i]={glyph:ch,colour:validColour(colour)?colour:'#ffffff',represents:state.glyphPalette[i].represents||''};if(state.glyphPrimary===old)state.glyphPrimary=ch;if(state.glyphSecondary===old)state.glyphSecondary=ch}
+  savePalettePrefs();$('#paletteDialog').close();refreshGlyphColourUI();if($('#glyphColourManagerDialog')?.open)renderGlyphColourManager();setMessage('Palette saved locally')
+}
+function removePaletteGlyph(index=state.paletteEditIndex){
+  if(!Number.isInteger(index)||index<0||index>=state.glyphPalette.length)return;if(state.glyphPalette.length<=1){setMessage('Palette must contain at least one glyph');return}
+  const old=state.glyphPalette[index].glyph;state.glyphPalette.splice(index,1);if(state.glyphPrimary===old)state.glyphPrimary=state.glyphPalette[0].glyph;if(state.glyphSecondary===old)state.glyphSecondary=state.glyphPalette[Math.min(1,state.glyphPalette.length-1)].glyph;savePalettePrefs();if($('#paletteDialog')?.open)$('#paletteDialog').close();buildGlyphPalette();setMessage('Glyph removed; palette saved locally')
+}
+function resetPalette(){if(!confirm('Restore the default GlyphPoint palette?'))return;state.glyphPalette=DEFAULT_GLYPH_PALETTE.map(e=>({...e}));state.glyphPrimary='#';state.glyphSecondary='+';state.drawGlyph='#';savePalettePrefs();buildGlyphPalette();setMessage('Default palette restored')}
+function setPrimaryGlyph(ch){state.glyphPrimary=ch;state.drawGlyph=ch;savePalettePrefs();buildGlyphPalette();setMessage(`Primary glyph: ${displayGlyph(ch)}`)}
+function setSecondaryGlyph(ch){state.glyphSecondary=ch;savePalettePrefs();buildGlyphPalette();setMessage(`Secondary glyph: ${displayGlyph(ch)}`)}
+function setDrawGlyph(e){return e.button===2?state.glyphSecondary:state.glyphPrimary}
+function buildGlyphColourPanel(){
+  const panel=$('#glyphColourPanel');if(!panel)return;panel.innerHTML='';
+  const bgRow=document.createElement('div');bgRow.className='gc-row';
+  const bgLabel=document.createElement('span');bgLabel.className='gc-ch';bgLabel.textContent='Bg';bgLabel.title='Field background colour';
+  const bgSwatch=document.createElement('div');bgSwatch.className='gc-swatch';bgSwatch.style.background=state.fieldBg;bgSwatch.title='Field background colour';
+  bgSwatch.onclick=e=>{e.stopPropagation();openColourPicker(e.clientX,e.clientY,state.fieldBg,h=>{state.fieldBg=h;bgSwatch.style.background=h;renderAll()})};
+  const bgDel=document.createElement('button');bgDel.className='gc-del';bgDel.textContent='\u00D7';bgDel.title='Reset background to black';
+  bgDel.onclick=()=>{state.fieldBg='#000000';bgSwatch.style.background=state.fieldBg;renderAll()};
+  bgRow.append(bgLabel,bgSwatch,bgDel);panel.appendChild(bgRow);
+  const counts={};state.cells.forEach(c=>{counts[c.ch]=(counts[c.ch]||0)+1});
+  const glyphs=Object.keys(counts).filter(ch=>ch!==' ').sort();
+  if(!glyphs.length)return;
+  for(const ch of glyphs){
+    const row=document.createElement('div');row.className='gc-row';
+    const label=document.createElement('span');label.className='gc-ch';label.textContent=displayGlyph(ch);
+    const swatch=document.createElement('div');swatch.className='gc-swatch';swatch.style.background=getGlyphColour(ch);
+    swatch.title=`Colour for "${ch===''?'space':ch}"`;
+    swatch.onclick=e=>{e.stopPropagation();openColourPicker(e.clientX,e.clientY,getGlyphColour(ch),h=>{setGlyphColour(ch,h,{persist:true,refresh:false});swatch.style.background=h;renderAll();buildGlyphPalette()})};
+    const count=document.createElement('span');count.className='gc-count';count.textContent=counts[ch];
+    const del=document.createElement('button');del.className='gc-del';del.textContent='\u00D7';
+    del.title='Reset to default colour';
+    del.onclick=()=>{setGlyphColour(ch,defaultColourForGlyph(ch))};
+    row.append(label,swatch,count,del);
+    panel.appendChild(row);
+  }
+}
+const COLOUR_PRESETS=['#000000','#ffffff','#808080','#ff0000','#ff8000','#ffff00','#00b050','#00cccc','#0060ff','#6000ff','#ff00ff','#a0522d'];
+let cpOnChange=c=>{};
+function hexToHsl(hex){const c=hexRgb(hex);if(!c)return{h:0,s:0,l:128};const r=c.r/255,g=c.g/255,b=c.b/255,mx=Math.max(r,g,b),mn=Math.min(r,g,b);let h=0,s=0;const l=(mx+mn)/2;if(mx!==mn){const d=mx-mn;s=l>0.5?d/(2-mx-mn):d/(mx+mn);switch(mx){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;default:h=(r-g)/d+4}h/=6}return{h:h*360,s:s*255,l:l*255}}
+function hslToHex(h,s,l){s/=255;l/=255;const c=(1-Math.abs(2*l-1))*s,x=c*(1-Math.abs(((h/60)%2)-1)),m=l-c/2;let r=0,g=0,b=0;if(h<60){r=c;g=x}else if(h<120){r=x;g=c}else if(h<180){g=c;b=x}else if(h<240){g=x;b=c}else if(h<300){r=x;b=c}else{r=c;b=x}return '#'+[Math.round((r+m)*255),Math.round((g+m)*255),Math.round((b+m)*255)].map(v=>Math.max(0,Math.min(255,v)).toString(16).padStart(2,'0')).join('')}
+function cpickCurrent(){return hslToHex(+$('#cpickH').value,+$('#cpickSat').value,+$('#cpickL').value)}
+function cpickPreview(){const hex=cpickCurrent();$('#cpickSwatch').style.background=hex;$('#cpickHexInput').value=hex}
+function cpickApply(){cpickPreview();cpOnChange(cpickCurrent())}
+function cpickFromHex(hex){const h=hexToHsl(hex);$('#cpickH').value=h.h;$('#cpickSat').value=h.s;$('#cpickL').value=h.l;cpickApply()}
+function buildColourPresets(){const box=$('#cpickPresets');COLOUR_PRESETS.forEach(c=>{const b=document.createElement('button');b.className='cpick-preset';b.style.background=c;b.dataset.c=c;b.title=c;b.onclick=()=>cpickFromHex(c);box.appendChild(b)})}
+function openColourPicker(x,y,hex,onchange){
+  cpOnChange=onchange;
+  const h=hexToHsl(hex);$('#cpickH').value=h.h;$('#cpickSat').value=h.s;$('#cpickL').value=h.l;
+  cpickPreview();
+  const p=$('#colorPicker');p.hidden=false;
+  p.style.left=clamp(x+10,4,innerWidth-p.offsetWidth-8)+'px';
+  p.style.top=clamp(y+10,4,innerHeight-p.offsetHeight-8)+'px';
+}
+function closeColourPicker(){const p=$('#colorPicker');if(p)p.hidden=true}
+const SHAPE_NAMES={line:'Line',rect:'Rectangle',ellipse:'Ellipse',triangle:'Triangle',rightTri:'Right triangle',diamond:'Diamond',arrowR:'Arrow right',arrowL:'Arrow left',arrowU:'Arrow up',arrowD:'Arrow down',slash:'Diagonal /',bslash:'Diagonal \\'};
+function buildShapes(){const sg=$('#shapeGrid');sg.innerHTML='';for(const [id,ico] of SHAPES){const b=document.createElement('button');b.className='shape';b.dataset.shape=id;b.title=SHAPE_NAMES[id]||id;b.textContent=ico;b.onclick=()=>{state.shape=id;setTool('shape')};sg.appendChild(b)}}
+function setTool(t){state.tool=t;$$('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#selectBtn').classList.toggle('active',t==='select');$$('.shape').forEach(b=>b.classList.toggle('active',t==='shape'&&b.dataset.shape===state.shape));const names={pencil:'Pencil',fill:'Flood fill',text:'Text',eraser:'Eraser',picker:'Glyph picker',magnifier:'Magnifier',select:'Selection',shape:SHAPE_NAMES[state.shape]||'Shape'};setMessage(`${names[t]||t} tool`)}
+
+function eventCell(e){let el=e.target?.closest?.('.cell');if(!el&&Number.isFinite(e.clientX))el=document.elementFromPoint(e.clientX,e.clientY)?.closest?.('.cell');if(!el)return null;const i=+el.dataset.i;return {i,x:i%state.cols,y:Math.floor(i/state.cols),el}}
+function edgeCell(e){if(!Number.isFinite(e.clientX)&&!Number.isFinite(e.clientY))return null;const r=$('#canvasGrid').getBoundingClientRect();let x=Math.floor((e.clientX-r.left)/r.width*state.cols),y=Math.floor((e.clientY-r.top)/r.height*state.rows);x=clamp(x,0,state.cols-1);y=clamp(y,0,state.rows-1);const i=idx(x,y);return{i,x,y,el:state.els[i]}}
+function footprintOf(x,y,size,brushShape=state.brushShape){const out=[];size=Math.max(1,Math.round(size)||1);const ratio=BRUSH_RATIOS[brushShape];if(ratio){const w=size*ratio[0],h=size*ratio[1],x0=-Math.floor((w-1)/2),y0=-Math.floor((h-1)/2);for(let dy=y0;dy<y0+h;dy++)for(let dx=x0;dx<x0+w;dx++){const px=x+dx,py=y+dy;if(inBounds(px,py))out.push([px,py])}return out}const half=Math.floor(size/2);for(let dy=-half;dy<=half;dy++)for(let dx=-half;dx<=half;dx++){const px=x+dx,py=y+dy;if(!inBounds(px,py))continue;if(brushShape==='circle'&&Math.hypot(dx,dy)>size/2)continue;out.push([px,py])}return out}
+function edgeOf(pts){const set=new Set(pts.map(p=>`${p[0]},${p[1]}`)),out=[];for(const [x,y] of pts){let e=false;for(const [nx,ny] of [[x+1,y],[x-1,y],[x,y+1],[x,y-1]])if(!inBounds(nx,ny)||!set.has(`${nx},${ny}`)){e=true;break}if(e)out.push([x,y])}return out}
+
+function bindUI(){
+  $('#fileBtn').onclick=e=>{const m=$('#fileMenu');const r=e.target.getBoundingClientRect();m.style.left=r.left+'px';m.style.top=r.bottom+'px';m.classList.toggle('open')};
+  document.addEventListener('pointerdown',e=>{if(!e.target.closest('#fileMenu')&&!e.target.closest('#fileBtn'))$('#fileMenu').classList.remove('open')});
+  $('#qUndo').onclick=undo;$('#qRedo').onclick=redo;$('#uiModeToggle').onclick=()=>setUiMode(state.uiMode==='classic'?'ribbon':'classic');
+  $$('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));$('#selectBtn').onclick=()=>setTool('select');
+  const commitBrushSize=e=>{let v=Math.round(+e.target.value);if(!Number.isFinite(v))v=1;v=clamp(v,1,60);e.target.value=v;state.brushSize=v};$('#brushSize').oninput=commitBrushSize;$('#brushSize').onchange=commitBrushSize;$('#shapeSize').onchange=e=>state.shapeSize=+e.target.value;$('#outlineMode').onchange=e=>state.outlineMode=e.target.value;$('#fillMode').onchange=e=>state.fillMode=e.target.value;
+  $$('[data-bs]').forEach(b=>b.onclick=()=>{state.brushShape=b.dataset.bs;$$('[data-bs]').forEach(x=>x.classList.toggle('active',x.dataset.bs===state.brushShape))});
+  $('#cutBtn').onclick=cutSelection;$('#copyBtn').onclick=copySelection;$('#pasteBtn').onclick=pasteSelection;$('#cropBtn').onclick=cropSelection;$('#resizeBtn').onclick=openResize;
+  $$('[data-transform]').forEach(b=>b.onclick=()=>transform(b.dataset.transform));
+  $('#selectAllBtn').onclick=()=>{state.selection={type:'rect',x:0,y:0,w:state.cols,h:state.rows};renderSelection();updateStats();setTool('select')};
+  $('#deleteBtn').onclick=deleteSelection;
+  $('#transparentRibbon').onchange=e=>{state.transparentSelect=e.target.checked;$('#transparentSelect').checked=e.target.checked};
+  $('#glyphPalette').addEventListener('contextmenu',e=>e.preventDefault());
+  $('#gpEditBtn').onclick=()=>setPaletteEditing(!state.paletteEditing);$('#gpResetBtn').onclick=resetPalette;$('#gpColoursBtn').onclick=openGlyphColourManager;
+  $('#gpBgBtn').onclick=()=>{state.paletteBgMode=state.paletteBgMode==='invert'?'grey':'invert';savePalettePrefs();buildGlyphPalette();setMessage(state.paletteBgMode==='invert'?'Palette contrast: inverted':'Palette contrast: neutral')};
+  $$('#cpickH,#cpickSat,#cpickL').forEach(s=>s.oninput=cpickApply);
+  $('#cpickHexInput').onchange=e=>{const m=/^#?([0-9a-f]{6})$/i.exec(String(e.target.value).trim());if(m)cpickFromHex('#'+m[1].trim())};
+  document.addEventListener('pointerdown',e=>{const p=$('#colorPicker');if(p&&!p.hidden&&!e.target.closest('#colorPicker')&&!e.target.closest('.gc-swatch'))closeColourPicker()});
+  $('#paletteApplyBtn').onclick=e=>{e.preventDefault();applyPaletteEditor()};$('#paletteRemoveBtn').onclick=e=>{e.preventDefault();removePaletteGlyph()};$('#paletteGlyphInput').oninput=e=>{const one=[...e.target.value][0]||'';if(e.target.value!==one)e.target.value=one};$('#paletteGlyphInput').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();applyPaletteEditor()}};
+  $('#gcmSearch').oninput=renderGlyphColourManager;$('#gcmSort').onchange=renderGlyphColourManager;$('#gcmAdd').onclick=addGlyphFromManager;$('#gcmResetAll').onclick=resetAllGlyphColours;$('#gcmRevert').onclick=revertGlyphManager;$('#gcmClose').onclick=closeGlyphColourManager;$('#gcmCloseX').onclick=closeGlyphColourManager;$('#gcmFileBtn').onclick=e=>{e.stopPropagation();openGcmMenu(e.currentTarget,$('#gcmFileMenu'))};$('#gcmThemeBtn').onclick=e=>{e.stopPropagation();openGcmMenu(e.currentTarget,$('#gcmThemeMenu'))};$('#gcmFileMenu').onclick=e=>{const a=e.target.dataset.gcmFile;if(a==='import')$('#gcmImportInput').click();else if(a==='export')exportGlyphPalette();closeGcmMenus()};$('#gcmImportInput').onchange=importGlyphPaletteFile;document.addEventListener('pointerdown',e=>{if(!e.target.closest('.gcm-menu')&&!e.target.closest('.gcm-menubtn'))closeGcmMenus()});
+  $('#canvasGrid').addEventListener('contextmenu',e=>e.preventDefault());
+  $('#canvasGrid').addEventListener('pointerdown',pointerDown);document.addEventListener('pointermove',pointerMove);document.addEventListener('pointerup',pointerUp);
+  $('#zoomIn').onclick=()=>setZoom(state.zoom*2);$('#zoomOut').onclick=()=>setZoom(state.zoom/2);$('#zoom100').onclick=()=>setZoom(1);$('#zminus').onclick=()=>setZoom(state.zoom-0.25);$('#zplus').onclick=()=>setZoom(state.zoom+0.25);$('#zoomSlider').oninput=e=>setZoom(+e.target.value/100);
+  $('#gridToggle').onchange=e=>{state.grid=e.target.checked;$('#canvasGrid').classList.toggle('gridlines',state.grid)};$('#rulerToggle').onchange=e=>{state.rulers=e.target.checked;$('#workspace').classList.toggle('no-rulers',!state.rulers)};$('#statusToggle').onchange=e=>{$('#statusbar').classList.toggle('hidden',!e.target.checked)};
+  $('#squareToggle').onclick=e=>{state.square=!state.square;e.currentTarget.setAttribute('aria-pressed',state.square);rebuildGrid();requestAnimationFrame(renderRulers)};$('#fieldBgInput').oninput=e=>{state.fieldBg=e.target.value;renderAll();buildGlyphPalette();markDirty()};
+  $('#fullscreen').onclick=()=>document.documentElement.requestFullscreen?.();
+  $('#resizeDialog').addEventListener('close',()=>{});$('#resizeW').addEventListener('input',()=>syncResizeAspect('w'));$('#resizeH').addEventListener('input',()=>syncResizeAspect('h'));$('#resizeUnit').addEventListener('change',openResize);$('#applyResize').onclick=e=>{e.preventDefault();applyResizeSkew();$('#resizeDialog').close()};
+  $('#applyText').onclick=e=>{e.preventDefault();placeText();$('#textDialog').close()};
+  $('#applyProps').onclick=e=>{e.preventDefault();applyProperties();$('#propertiesDialog').close()};
+  $$('dialog button[value="cancel"]').forEach(b=>b.onclick=()=>b.closest('dialog').close());
+  $('#openProjectInput').onchange=openProjectFile;$('#openTxtInput').onchange=openTxtFile;$('#openHtmlInput').onchange=openHtmlFile;
+  $$('#fileMenu [data-file]').forEach(b=>b.onclick=()=>handleFile(b.dataset.file));
+  window.addEventListener('keydown',keyboard);window.addEventListener('resize',updateClassicOverflow);if('ResizeObserver' in window)new ResizeObserver(updateClassicOverflow).observe($('#homeRibbon'));
+}
+
+
+function pointerDown(e){
+  const p=eventCell(e);if(!p)return;e.preventDefault();$('#canvasGrid').setPointerCapture?.(e.pointerId);state.drawing=true;state.shiftHeld=!!e.shiftKey;state.drawButton=e.button;state.actionStart=p;state.lastCell=p;state.freePath=[p];
+  const g=setDrawGlyph(e);
+  if(state.tool==='pencil'){state.drawGlyph=g;snapshot();paintBrush(p.x,p.y,g,true)}
+  else if(state.tool==='eraser'){snapshot();eraseBrush(p.x,p.y)}
+  else if(state.tool==='fill'){snapshot();floodFill(p.x,p.y,g);state.drawing=false}
+  else if(state.tool==='picker'){const c=getCell(p.x,p.y);if(c){if(e.button===2)setSecondaryGlyph(c.ch);else setPrimaryGlyph(c.ch)}state.drawing=false}
+  else if(state.tool==='magnifier'){setZoom(state.zoom<2?state.zoom*2:state.zoom/2);state.drawing=false}
+  else if(state.tool==='text'){state.textAnchor=p;$('#textValue').value='';$('#textDialog').showModal();state.drawing=false}
+  else if(state.tool==='select'){
+    if(state.selection&&selectionContains(p.x,p.y)){state.moveSelection={start:p,copy:captureSelection(),bounds:selectionBounds()};}
+    else{state.selection=null;clearSelectionClasses();if($('#selectMode').value==='free')state.freePath=[p]}
+  }
+  else if(state.tool==='shape'){clearPreview();previewShape(state.actionStart,p)}
+}
+function pointerMove(e){
+  if(e.shiftKey!==undefined)state.shiftHeld=!!e.shiftKey;
+  const hv=eventCell(e)||(state.drawing?edgeCell(e):null);
+  for(const i of hoveredCells)state.els[i]?.classList.remove('hovered');
+  hoveredCells=[];
+  if(hv){
+    if(state.tool!=='fill'&&state.tool!=='text'&&state.tool!=='magnifier'&&state.tool!=='picker'){
+      const size=state.tool==='shape'?state.shapeSize:state.brushSize;
+      hoveredCells=edgeOf(footprintOf(hv.x,hv.y,size,state.tool==='shape'?'square':state.brushShape)).map(([x,y])=>idx(x,y));
+      for(const i of hoveredCells)state.els[i]?.classList.add('hovered');
+    }
+    $('#cursorStat').textContent=`${hv.x}, ${hv.y}`;
+  }else{$('#cursorStat').textContent=''}
+  if(!state.drawing)return;
+  const p=eventCell(e)||(state.tool==='shape'||state.tool==='select'?edgeCell(e):null);
+  if(!p)return;
+  if(state.tool==='pencil'){drawLine(state.lastCell.x,state.lastCell.y,p.x,p.y,(x,y)=>paintBrush(x,y,state.drawGlyph,true));state.lastCell=p}
+  else if(state.tool==='eraser'){drawLine(state.lastCell.x,state.lastCell.y,p.x,p.y,(x,y)=>eraseBrush(x,y));state.lastCell=p}
+  else if(state.tool==='select'){if(state.moveSelection){previewMoveSelection(p)}else if($('#selectMode').value==='free'){state.freePath.push(p);previewFreeSelection()}else previewRectSelection(state.actionStart,p)}
+  else if(state.tool==='shape'){const q=state.shiftHeld?snapB(state.actionStart,p):p;previewShape(state.actionStart,q)}
+}
+function pointerUp(e){if(!state.drawing)return;const p=eventCell(e)||edgeCell(e)||state.lastCell||state.actionStart;state.drawing=false;
+  if(state.tool==='select'){
+    if(state.moveSelection){commitMoveSelection(p);state.moveSelection=null}
+    else if($('#selectMode').value==='free')commitFreeSelection();else commitRectSelection(state.actionStart,p);
+  }else if(state.tool==='shape'){const q=state.shiftHeld?snapB(state.actionStart,p):p;clearPreview();snapshot();drawShape(state.shape,state.actionStart,q);markDirty()}
+}
+
+function paintBrush(x,y,ch,drag=false){const g=ch||'#';for(const [px,py] of footprintOf(x,y,state.brushSize))setCell(px,py,{ch:g,fg:'',bg:'',font:'Cascadia Mono',bold:false,italic:false,underline:false});markDirty()}
+function eraseBrush(x,y){for(const [px,py] of footprintOf(x,y,state.brushSize))setCell(px,py,makeCell(' '));markDirty()}
+function floodFill(x,y,g){
+  const target=getCell(x,y);if(!target)return;const ts=target.ch;
+  const ch=g||state.glyphPrimary;
+  const q=[[x,y]],seen=new Set([`${x},${y}`]);
+  while(q.length){const [cx,cy]=q.pop();const c=getCell(cx,cy);if(!c||c.ch!==ts)continue;setCell(cx,cy,{ch,fg:'',bg:'',font:'Cascadia Mono',bold:false,italic:false,underline:false});for(const [nx,ny] of [[cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1]]){const k=`${nx},${ny}`;if(inBounds(nx,ny)&&!seen.has(k)){seen.add(k);q.push([nx,ny])}}}
+  markDirty()
+}
+function drawLine(x0,y0,x1,y1,fn){let dx=Math.abs(x1-x0),sx=x0<x1?1:-1,dy=-Math.abs(y1-y0),sy=y0<y1?1:-1,err=dx+dy;while(true){fn(x0,y0);if(x0===x1&&y0===y1)break;const e2=2*err;if(e2>=dy){err+=dy;x0+=sx}if(e2<=dx){err+=dx;y0+=sy}}}
+function lineGlyph(x0,y0,x1,y1){const dx=x1-x0,dy=y1-y0;if(Math.abs(dx)>Math.abs(dy)*1.8)return '\u2500';if(Math.abs(dy)>Math.abs(dx)*1.8)return '\u2502';return dx*dy>=0?'\\':'/'}
+function strokePoint(x,y,ch,size){for(let oy=-Math.floor(size/2);oy<=Math.floor(size/2);oy++)for(let ox=-Math.floor(size/2);ox<=Math.floor(size/2);ox++)if(inBounds(x+ox,y+oy))setCell(x+ox,y+oy,{ch,fg:'',bg:'',font:'Cascadia Mono',bold:false,italic:false,underline:false})}
+function strokeSegment(a,b,size=1){
+  const g=state.glyphPrimary;
+  const ch=state.outlineMode==='rough'?g:lineGlyph(a.x,a.y,b.x,b.y);
+  drawLine(a.x,a.y,b.x,b.y,(x,y)=>strokePoint(x,y,ch,size))
+}
+function rectBounds(a,b){const x0=Math.min(a.x,b.x),x1=Math.max(a.x,b.x),y0=Math.min(a.y,b.y),y1=Math.max(a.y,b.y);return{x0,y0,x1,y1,w:x1-x0+1,h:y1-y0+1}}
+function snapB(a,b){const dx=b.x-a.x,dy=b.y-a.y,s=Math.max(Math.abs(dx),Math.abs(dy));if(!s)return b;const sx=dx?Math.sign(dx):1,sy=dy?Math.sign(dy):1;return{x:a.x+sx*s,y:a.y+sy*s}}
+function fillGlyph(){if(state.fillMode==='secondary')return state.glyphSecondary;return state.glyphPrimary}
+function collectOutline(edges,size){const s=new Set();const half=Math.floor(size/2);for(const [a,b] of edges)drawLine(a.x,a.y,b.x,b.y,(x,y)=>{for(let oy=-half;oy<=half;oy++)for(let ox=-half;ox<=half;ox++)if(inBounds(x+ox,y+oy))s.add(idx(x+ox,y+oy))});return s}
+function drawRingChar(ring,x,y){const up=ring.has(idx(x,y-1)),dn=ring.has(idx(x,y+1)),lf=ring.has(idx(x-1,y)),rt=ring.has(idx(x+1,y)),h=(lf?1:0)+(rt?1:0),v=(up?1:0)+(dn?1:0);if(h===0&&v===0)return state.glyphPrimary;if(h===0)return '\u2502';if(v===0)return '\u2500';if(h===1&&v===1){if(rt&&dn)return '\u250C';if(rt&&up)return '\u2514';if(lf&&dn)return '\u2510';if(lf&&up)return '\u2518'}if(h===2&&v===1)return dn?'\u252C':'\u2534';if(h===1&&v===2)return rt?'\u251C':'\u2524';return '\u253C'}
+function outlineRingFromRows(rows){
+  const ring=new Set(),byY=new Map(rows.map(r=>[r.y,r]));
+  for(const {y,min,max} of rows){
+    const up=byY.get(y-1),dn=byY.get(y+1);
+    for(let x=min;x<=max;x++){
+      const edgeX=x===min||x===max;
+      const edgeY=!up||x<up.min||x>up.max||!dn||x<dn.min||x>dn.max;
+      if(edgeX||edgeY)ring.add(idx(x,y));
+    }
+  }
+  return ring;
+}
+function transposeRows(rows){const m=new Map();for(const r of rows)for(let x=r.min;x<=r.max;x++){const e=m.get(x)||[Number.MAX_SAFE_INTEGER,-Number.MAX_SAFE_INTEGER];if(r.y<e[0])e[0]=r.y;if(r.y>e[1])e[1]=r.y;m.set(x,e)}const out=[];for(const [x,e] of m)out.push({y:x,min:e[0],max:e[1]});return out.sort((a,b)=>a.y-b.y)}
+function arrowRowsR(r){return transposeRows(arrowRowsUD('arrowD',{x0:r.y0,y0:r.x0,x1:r.y1,y1:r.x1}))}
+function arrowRowsL(r){return transposeRows(arrowRowsUD('arrowU',{x0:r.y0,y0:r.x0,x1:r.y1,y1:r.x1}))}
+function arrowRowsUD(shape,r){
+  const x0=r.x0,x1=r.x1,y0=r.y0,y1=r.y1,w=x1-x0,h=y1-y0,aX=Math.floor((x0+x1)/2),aXR=x0+x1-aX,s=Math.min(w,h),rows=[];
+  if(h===0)return[{y:y0,min:x0,max:x1}];
+  if(w===0){const a=[];for(let y=y0;y<=y1;y++)a.push({y,min:aX,max:aX});return a}
+  const headHt=Math.max(1,Math.round(s/2)),th=Math.max(1,Math.round(s*.2));
+  for(let y=y0;y<=y1;y++){
+    const dy=(shape==='arrowU'?y-y0:y1-y);let mn,mx;
+    if(dy<headHt){const hw=headHt>1?Math.round(dy/(headHt-1)*w/2):Math.round(w/2);mn=Math.max(x0,aX-hw);mx=Math.min(x1,aXR+hw)}
+    else{const tw=Math.floor(th/2);mn=Math.max(x0,aX-tw);mx=Math.min(x1,aXR+tw)}
+    rows.push({y,min:mn,max:mx});
+  }
+  return rows;
+}
+function arrowRows(shape,r){
+  if(shape==='arrowR')return arrowRowsR(r);
+  if(shape==='arrowL')return arrowRowsL(r);
+  return arrowRowsUD(shape,r);
+}
+function shapeRows(shape,r){
+  const x0=r.x0,x1=r.x1,y0=r.y0,y1=r.y1,w=x1-x0,h=y1-y0,aX=Math.floor((x0+x1)/2),aXR=x0+x1-aX,rows=[];
+  if(shape==='rect'){for(let y=y0;y<=y1;y++)rows.push({y,min:x0,max:x1});return rows}
+  if(shape==='ellipse'){const cy=(y0+y1)/2,ry=h/2,rx=w/2;for(let y=y0;y<=y1;y++){const nd=(y-cy)/ry;if(Math.abs(nd)>1)continue;const wl=Math.round(rx*Math.sqrt(Math.max(0,1-nd*nd)));rows.push({y,min:Math.max(x0,aX-wl),max:Math.min(x1,aXR+wl)})}return rows}
+  if(shape==='triangle'){const H=Math.max(1,h);for(let y=y0;y<=y1;y++){const e=Math.round(w/2*(y-y0)/H);rows.push({y,min:Math.max(x0,aX-e),max:Math.min(x1,aXR+e)})}return rows}
+  if(shape==='diamond'){const cy=(y0+y1)/2,ry=Math.max(1,h/2);for(let y=y0;y<=y1;y++){const e=Math.round(w/2*(1-Math.abs((y-cy)/ry)));rows.push({y,min:Math.max(x0,aX-e),max:Math.min(x1,aXR+e)})}return rows}
+  if(shape==='arrowR'||shape==='arrowL'||shape==='arrowU'||shape==='arrowD')return arrowRows(shape,r);
+  if(shape==='slash'||shape==='bslash'){
+    const a=shape==='slash'?{x:x1,y:y0}:{x:x0,y:y0},b=shape==='slash'?{x:x0,y:y1}:{x:x1,y:y1},seg=new Map();
+    drawLine(a.x,a.y,b.x,b.y,(x,y)=>{const e=seg.get(y)||[Number.MAX_SAFE_INTEGER,-Number.MAX_SAFE_INTEGER];if(x<e[0])e[0]=x;if(x>e[1])e[1]=x;seg.set(y,e)});
+    return [...seg.entries()].sort((p,q)=>p[0]-q[0]).map(([y,[mn,mx]])=>({y,min:mn,max:mx}));
+  }
+  return null}
+function shapeEdges(shape,r){
+  const x0=r.x0,x1=r.x1,y0=r.y0,y1=r.y1;
+  if(shape==='rightTri')return {e:[[{x:x0,y:y0},{x:x1,y:y1}],[{x:x1,y:y1},{x:x0,y:y1}],[{x:x0,y:y1},{x:x0,y:y0}]]};
+  return {e:[[{x:x0,y:y0},{x:x1,y:y0}],[{x:x1,y:y0},{x:x1,y:y1}],[{x:x1,y:y1},{x:x0,y:y1}],[{x:x0,y:y1},{x:x0,y:y0}]]};
+}
+function enclosedFill(edges,b){const ring=collectOutline(edges,state.shapeSize),g=fillGlyph();for(let y=b.y0;y<=b.y1;y++){let min=null,max=null;for(let x=0;x<state.cols;x++){if(ring.has(idx(x,y))){if(min===null)min=x;max=x}}if(min===null)continue;for(let x=min;x<=max;x++)strokePoint(x,y,g,state.shapeSize)}}
+function strokeRing(x,y,sz,ring){const ch=state.outlineMode==='rough'?state.glyphPrimary:drawRingChar(ring,x,y);strokePoint(x,y,ch,sz)}
+function drawShape(shape,a,b){
+  let r=rectBounds(a,b);
+  if(shape==='line'){strokeSegment(a,b,state.shapeSize);return}
+  const rows=shapeRows(shape,r);
+  if(rows){
+    const sz=state.shapeSize,isArrow=shape==='arrowR'||shape==='arrowL'||shape==='arrowU'||shape==='arrowD';
+    const ring=isArrow?outlineRingFromRows(rows):new Set();
+    if(!isArrow)for(const {y,min,max} of rows){ring.add(idx(min,y));ring.add(idx(max,y))}
+    if(shape==='rect'){for(let x=r.x0;x<=r.x1;x++){ring.add(idx(x,r.y0));ring.add(idx(x,r.y1))}for(let y=r.y0;y<=r.y1;y++){ring.add(idx(r.x0,y));ring.add(idx(r.x1,y))}}
+    if(shape==='triangle')for(let x=r.x0;x<=r.x1;x++)ring.add(idx(x,r.y1));
+    if(state.fillMode!=='none')for(const {y,min,max} of rows)for(let x=min;x<=max;x++)strokePoint(x,y,fillGlyph(),sz);
+    if(state.outlineMode!=='none')for(const i of ring){const x=i%state.cols,y=Math.floor(i/state.cols);strokeRing(x,y,sz,ring)}
+  }else{
+    const e=shapeEdges(shape,r).e;
+    if(state.fillMode!=='none')enclosedFill(e,r);
+    if(state.outlineMode!=='none')for(const [p,q] of e)strokeSegment(p,q,state.shapeSize);
+  }
+}
+function shapePoints(s){const P={polygon:[[.1,.3],[.35,0],[.8,.08],[1,.5],[.75,1],[.2,.92],[0,.55]],triangle:[[.5,0],[1,1],[0,1]],rightTri:[[0,0],[1,1],[0,1]],diamond:[[.5,0],[1,.5],[.5,1],[0,.5]],arrowR:[[0,.3],[.62,.3],[.62,0],[1,.5],[.62,1],[.62,.7],[0,.7]],arrowL:[[1,.3],[.38,.3],[.38,0],[0,.5],[.38,1],[.38,.7],[1,.7]],arrowU:[[.3,1],[.3,.38],[0,.38],[.5,0],[1,.38],[.7,.38],[.7,1]],arrowD:[[.3,0],[.3,.62],[0,.62],[.5,1],[1,.62],[.7,.62],[.7,0]]};return P[s]||null}
+function pointInPoly(x,y,pts){let inside=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const xi=pts[i].x,yi=pts[i].y,xj=pts[j].x,yj=pts[j].y;const inter=((yi>y)!=(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi+1e-9)+xi);if(inter)inside=!inside}return inside}
+
+function renderPreview(){for(const i of state.preview)state.els[i]?.classList.add('preview')}
+function clearPreview(){for(const i of state.preview)state.els[i]?.classList.remove('preview');state.preview.clear()}
+function previewShape(a,b){clearPreview();const r=rectBounds(a,b);for(let x=r.x0;x<=r.x1;x++){addPreview(x,r.y0);addPreview(x,r.y1)}for(let y=r.y0;y<=r.y1;y++){addPreview(r.x0,y);addPreview(r.x1,y)}}
+function addPreview(x,y){if(!inBounds(x,y))return;const i=idx(x,y);state.preview.add(i);state.els[i]?.classList.add('preview')}
+function previewRectSelection(a,b){clearPreview();const r=rectBounds(a,b);for(let x=r.x0;x<=r.x1;x++){addPreview(x,r.y0);addPreview(x,r.y1)}for(let y=r.y0;y<=r.y1;y++){addPreview(r.x0,y);addPreview(r.x1,y)}}
+function previewFreeSelection(){clearPreview();for(const p of state.freePath)addPreview(p.x,p.y)}
+
+function commitRectSelection(a,b){clearPreview();const r=rectBounds(a,b);state.selection={type:'rect',x:r.x0,y:r.y0,w:r.w,h:r.h};renderSelection();updateStats()}
+function commitFreeSelection(){clearPreview();if(state.freePath.length<3){state.selection=null;renderSelection();return}const xs=state.freePath.map(p=>p.x),ys=state.freePath.map(p=>p.y),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);const mask=[];for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)if(pointInPoly(x+.5,y+.5,state.freePath))mask.push([x-x0,y-y0]);state.selection={type:'free',x:x0,y:y0,w:x1-x0+1,h:y1-y0+1,mask};renderSelection();updateStats()}
+function clearSelectionClasses(){for(const e of state.els)e.classList.remove('selected')}
+function renderSelection(){clearSelectionClasses();if(!state.selection)return;const s=state.selection;if(s.type==='free'){const mask=new Set(s.mask.map(([dx,dy])=>`${dx},${dy}`));for(const [dx,dy] of s.mask){const x=s.x+dx,y=s.y+dy;let edge=false;for(const [nx,ny] of [[dx+1,dy],[dx-1,dy],[dx,dy+1],[dx,dy-1]])if(!mask.has(`${nx},${ny}`)){edge=true;break}if(edge&&inBounds(x,y))state.els[idx(x,y)]?.classList.add('selected')}}else for(let y=s.y;y<s.y+s.h;y++)for(let x=s.x;x<s.x+s.w;x++){if(!inBounds(x,y))continue;if(x===s.x||x===s.x+s.w-1||y===s.y||y===s.y+s.h-1)state.els[idx(x,y)]?.classList.add('selected')}}
+function selectionBounds(){return state.selection||{x:0,y:0,w:0,h:0}}
+function selectionContains(x,y){const s=state.selection;if(!s)return false;if(x<s.x||y<s.y||x>=s.x+s.w||y>=s.y+s.h)return false;if(s.type==='free')return s.mask.some(([dx,dy])=>s.x+dx===x&&s.y+dy===y);return true}
+function selectedPositions(){const s=state.selection;if(!s)return[];if(s.type==='free')return s.mask.map(([dx,dy])=>[s.x+dx,s.y+dy]);const a=[];for(let y=s.y;y<s.y+s.h;y++)for(let x=s.x;x<s.x+s.w;x++)a.push([x,y]);return a}
+function captureSelection(){if(!state.selection)return null;const s=selectionBounds(),map=new Map(selectedPositions().map(([x,y])=>[`${x-s.x},${y-s.y}`,deepCell(getCell(x,y))]));return{w:s.w,h:s.h,map:[...map.entries()],type:state.selection.type,mask:state.selection.mask||null}}
+async function copySelection(){if(!state.selection){setMessage('Select an area first');return}state.clipboard=captureSelection();const lines=[];for(let y=0;y<state.clipboard.h;y++){let line='';for(let x=0;x<state.clipboard.w;x++){const ent=state.clipboard.map.find(([k])=>k===`${x},${y}`);line+=ent?ent[1].ch:' '}lines.push(line)}try{await navigator.clipboard.writeText(lines.join('\n'))}catch{}setMessage('Copied selection')}
+async function cutSelection(){if(!state.selection)return;await copySelection();snapshot();for(const [x,y] of selectedPositions())setCell(x,y,makeCell(' '));markDirty();setMessage('Cut selection')}
+async function pasteSelection(){let clip=state.clipboard;if(!clip){try{const t=await navigator.clipboard.readText();if(t){const lines=t.split(/\r?\n/),w=Math.max(...lines.map(l=>[...l].length));clip={w,h:lines.length,map:[]};lines.forEach((l,y)=>[...l.padEnd(w)].forEach((ch,x)=>clip.map.push([`${x},${y}`,makeCell(ch)])))}}catch{}}if(!clip){setMessage('Clipboard empty');return}snapshot();const ox=state.selection?.x||0,oy=state.selection?.y||0;for(const [k,c] of clip.map){const [dx,dy]=k.split(',').map(Number);if(state.transparentSelect&&c.ch===' ')continue;if(inBounds(ox+dx,oy+dy))setCell(ox+dx,oy+dy,c)}state.selection={type:'rect',x:ox,y:oy,w:clip.w,h:clip.h};renderSelection();markDirty();setMessage('Pasted')}
+function previewMoveSelection(p){clearPreview();const m=state.moveSelection,dx=p.x-m.start.x,dy=p.y-m.start.y,minX=m.bounds.x+dx,minY=m.bounds.y+dy,maxX=minX+m.copy.w-1,maxY=minY+m.copy.h-1;for(let x=minX;x<=maxX;x++){addPreview(x,minY);addPreview(x,maxY)}for(let y=minY;y<=maxY;y++){addPreview(minX,y);addPreview(maxX,y)}}
+function commitMoveSelection(p){clearPreview();const m=state.moveSelection,dx=p.x-m.start.x,dy=p.y-m.start.y;snapshot();for(const [x,y] of selectedPositions())setCell(x,y,makeCell(' '));for(const [k,c] of m.copy.map){const [rx,ry]=k.split(',').map(Number);if(state.transparentSelect&&c.ch===' ')continue;setCell(m.bounds.x+rx+dx,m.bounds.y+ry+dy,c)}state.selection={...state.selection,x:m.bounds.x+dx,y:m.bounds.y+dy};renderSelection();markDirty()}
+function deleteSelection(){if(!state.selection){setMessage('Select an area first');return}snapshot();for(const [x,y] of selectedPositions())setCell(x,y,makeCell(' '));markDirty();setMessage('Deleted selection')}
+function cropSelection(){if(!state.selection){setMessage('Select an area first');return}snapshot();const s=selectionBounds(),nc=[];for(let y=0;y<s.h;y++)for(let x=0;x<s.w;x++)nc.push(inBounds(s.x+x,s.y+y)?deepCell(getCell(s.x+x,s.y+y)):makeCell());state.cols=s.w;state.rows=s.h;state.cells=nc;state.selection=null;rebuildGrid();markDirty();setMessage('Cropped')}
+
+function transform(type){
+  const s=state.selection?selectionBounds():{x:0,y:0,w:state.cols,h:state.rows};
+  const src=[];for(let y=0;y<s.h;y++){const row=[];for(let x=0;x<s.w;x++)row.push(deepCell(getCell(s.x+x,s.y+y)));src.push(row)}
+  let out=src,ow=s.w,oh=s.h;
+  if(type==='flipH')out=src.map(r=>[...r].reverse());
+  else if(type==='flipV')out=[...src].reverse();
+  else if(type==='rot180')out=[...src].reverse().map(r=>[...r].reverse());
+  else if(type==='rot90'){oh=s.w;ow=s.h;out=Array.from({length:oh},(_,y)=>Array.from({length:ow},(_,x)=>src[s.h-1-x][y]));}
+  else if(type==='rot270'){oh=s.w;ow=s.h;out=Array.from({length:oh},(_,y)=>Array.from({length:ow},(_,x)=>src[x][s.w-1-y]));}
+  snapshot();
+  if(!state.selection&&(type==='rot90'||type==='rot270')){state.cols=ow;state.rows=oh;state.cells=out.flat().map(deepCell);rebuildGrid();markDirty();setMessage('Rotated');return}
+  if(state.selection&&(type==='rot90'||type==='rot270')){
+    for(let y=s.y;y<s.y+s.h;y++)for(let x=s.x;x<s.x+s.w;x++)if(inBounds(x,y))setCell(x,y,makeCell(' '));
+    for(let y=0;y<oh;y++)for(let x=0;x<ow;x++)if(inBounds(s.x+x,s.y+y))setCell(s.x+x,s.y+y,out[y][x]);
+    state.selection={type:'rect',x:s.x,y:s.y,w:Math.min(ow,state.cols-s.x),h:Math.min(oh,state.rows-s.y)};
+  }else{
+    for(let y=0;y<s.h;y++)for(let x=0;x<s.w;x++)setCell(s.x+x,s.y+y,out[y][x]);
+  }
+  renderSelection();updateStats();markDirty();setMessage(type.startsWith('rot')?'Rotated':'Flipped');
+}
+
+function openResize(){const unit=$('#resizeUnit').value;state.resizeAspect=state.cols/state.rows;$('#resizeW').value=unit==='percent'?100:state.cols;$('#resizeH').value=unit==='percent'?100:state.rows;$('#skewX').value=0;$('#skewY').value=0;if(!$('#resizeDialog').open)$('#resizeDialog').showModal()}
+function syncResizeAspect(which){if(!$('#keepAspect').checked||state.aspectSync)return;state.aspectSync=true;const unit=$('#resizeUnit').value;if(unit==='percent'){if(which==='w')$('#resizeH').value=$('#resizeW').value;else $('#resizeW').value=$('#resizeH').value}else{if(which==='w')$('#resizeH').value=Math.max(1,Math.round((+$(`#resizeW`).value)/state.resizeAspect));else $('#resizeW').value=Math.max(1,Math.round((+$(`#resizeH`).value)*state.resizeAspect))}state.aspectSync=false}
+function applyResizeSkew(){snapshot();const unit=$('#resizeUnit').value;let nw=+$(`#resizeW`).value,nh=+$(`#resizeH`).value;if(unit==='percent'){nw=Math.max(1,Math.round(state.cols*nw/100));nh=Math.max(1,Math.round(state.rows*nh/100))}const old=state.cells.map(deepCell),oc=state.cols,or=state.rows;let resized=Array.from({length:nw*nh},()=>makeCell(' '));for(let y=0;y<nh;y++)for(let x=0;x<nw;x++){const sx=clamp(Math.floor(x*oc/nw),0,oc-1),sy=clamp(Math.floor(y*or/nh),0,or-1);resized[y*nw+x]=deepCell(old[sy*oc+sx])}state.cols=nw;state.rows=nh;state.cells=resized;const kx=Math.tan(($('#skewX').value||0)*Math.PI/180),ky=Math.tan(($('#skewY').value||0)*Math.PI/180);if(Math.abs(kx)>.001||Math.abs(ky)>.001){const src=state.cells.map(deepCell),out=Array.from({length:nw*nh},()=>makeCell(' '));for(let y=0;y<nh;y++)for(let x=0;x<nw;x++){const nx=Math.round(x+kx*y),ny=Math.round(y+ky*x);if(nx>=0&&ny>=0&&nx<nw&&ny<nh)out[ny*nw+nx]=deepCell(src[y*nw+x])}state.cells=out}state.selection=null;rebuildGrid();markDirty();setMessage('Resized / skewed')}
+
+function placeText(){if(!state.textAnchor)return;snapshot();const txt=$('#textValue').value,scale=+$(`#textScale`).value,font=$('#textFont').value,bold=$('#textBold').checked,italic=$('#textItalic').checked,underline=$('#textUnderline').checked,opaque=$('#textBg').value==='opaque';const lines=txt.split(/\r?\n/);for(let ly=0;ly<lines.length;ly++){const chars=[...lines[ly]];for(let cx=0;cx<chars.length;cx++)for(let sy=0;sy<scale;sy++)for(let sx=0;sx<scale;sx++){const x=state.textAnchor.x+cx*scale+sx,y=state.textAnchor.y+ly*scale+sy;if(inBounds(x,y))setCell(x,y,{ch:chars[cx],fg:'',bg:opaque?state.fieldBg||'#000000':'',font,bold,italic,underline})}}markDirty();setMessage('Text placed')}
+
+function setZoom(z){state.zoom=clamp(Math.round(z*4)/4,.25,8);$('#canvasWrap').style.transform=`scale(${state.zoom})`;$('#canvasWrap').style.marginRight=`${(state.zoom-1)*$('#canvasGrid').offsetWidth}px`;$('#canvasWrap').style.marginBottom=`${(state.zoom-1)*$('#canvasGrid').offsetHeight}px`;$('#zoomSlider').value=Math.round(state.zoom*100);$('#zoomLabel').textContent=Math.round(state.zoom*100)+'%';renderRulers()}
+function renderRulers(){const h=$('#hruler'),v=$('#vruler'),cell=state.els[0];if(!h||!v||!cell)return;const r=cell.getBoundingClientRect(),cw=r.width,ch=r.height;h.replaceChildren();v.replaceChildren();for(let x=0;x<state.cols;x+=5){const span=document.createElement('span');span.textContent=x;span.style.cssText=`display:inline-block;width:${Math.min(5,state.cols-x)*cw}px`;h.appendChild(span)}for(let y=0;y<state.rows;y+=5){const div=document.createElement('div');div.textContent=y;div.style.height=`${Math.min(5,state.rows-y)*ch}px`;v.appendChild(div)}}
+
+function handleFile(a){$('#fileMenu').classList.remove('open');if(a==='new'){if(!state.dirty||confirm('Discard current document?'))newDocument(80,80,true)}else if(a==='openProject')$('#openProjectInput').click();else if(a==='openTxt')$('#openTxtInput').click();else if(a==='openHtml')$('#openHtmlInput').click();else if(a==='saveProject')saveProject();else if(a==='exportTxt')downloadBlob(cellsToText(),'text/plain','glyphpoint.txt');else if(a==='exportHtml')exportHtml();else if(a==='properties')openProperties();else if(a==='colourManager')openGlyphColourManager();else if(a==='print')window.print();else if(a==='help')openHelp()}
+function cellsToText(){let out=[];for(let y=0;y<state.rows;y++){let s='';for(let x=0;x<state.cols;x++)s+=getCell(x,y).ch;out.push(s)}return out.join('\n')+'\n'}
+function saveProject(){const payload={format:'glyphpoint-v2',cols:state.cols,rows:state.rows,cells:state.cells,glyphPalette:state.glyphPalette,glyphPrimary:state.glyphPrimary,glyphSecondary:state.glyphSecondary,square:state.square,fieldBg:state.fieldBg};downloadBlob(JSON.stringify(payload,null,2),'application/json','glyphpoint-project.json');state.dirty=false;updateTitle();setMessage('Project saved')}
+function openProjectFile(e){const f=e.target.files[0];if(!f)return;f.text().then(t=>{const d=JSON.parse(t);if(!['glyphpoint-v1','glyphpoint-v2'].includes(d.format)||!Array.isArray(d.cells))throw Error('Not a GlyphPoint project');snapshot();state.cols=d.cols;state.rows=d.rows;state.cells=d.cells.map(c=>({...makeCell(),...c}));if(d.glyphPalette)state.glyphPalette=normalisePalette(d.glyphPalette,d.glyphColours||{});if(d.glyphPrimary)state.glyphPrimary=d.glyphPrimary;if(d.glyphSecondary)state.glyphSecondary=d.glyphSecondary;if(typeof d.square==='boolean')state.square=d.square;$('#squareToggle').setAttribute('aria-pressed',state.square);state.fieldBg=d.fieldBg||d.defaultBg||'#000000';if($('#fieldBgInput'))$('#fieldBgInput').value=state.fieldBg;state.docName=f.name;state.selection=null;rebuildGrid();buildGlyphPalette();state.dirty=false;updateTitle();setMessage('Project opened')}).catch(err=>alert(err.message));e.target.value=''}
+function openTxtFile(e){const f=e.target.files[0];if(!f)return;f.text().then(t=>{const lines=t.split(/\r?\n/);while(lines.length&&!lines[lines.length-1])lines.pop();if(!lines.length)throw Error('File is empty');const w=Math.max(...lines.map(l=>[...l].length));snapshot();state.cols=w;state.rows=lines.length;state.cells=[];for(let y=0;y<lines.length;y++){const chars=[...lines[y].padEnd(w)];for(let x=0;x<w;x++){state.cells.push(makeCell(chars[x]||' '))}}state.docName=f.name;state.selection=null;rebuildGrid();buildGlyphColourPanel();state.dirty=false;updateTitle();setMessage('Plain text imported')}).catch(err=>alert(err.message));e.target.value=''}
+async function openHtmlFile(e){const f=e.target.files[0];if(!f)return;try{const t=await f.text(),doc=new DOMParser().parseFromString(t,'text/html'),pre=doc.querySelector('#art')||doc.querySelector('pre');if(!pre)throw Error('No <pre id="art"> found');const rows=[];let cur=[];const walk=node=>{if(node.nodeType===3){for(const ch of node.nodeValue){if(ch==='\n'){rows.push(cur);cur=[]}else{cur.push(makeCell(ch))}}}else if(node.nodeType===1){node.childNodes.forEach(walk)}};walk(pre);if(cur.length)rows.push(cur);while(rows.length&&rows.at(-1).length===0)rows.pop();if(!rows.length)throw Error('Artwork is empty');const w=Math.max(...rows.map(r=>r.length));snapshot();state.cols=w;state.rows=rows.length;state.cells=[];for(const r of rows){for(let x=0;x<w;x++)state.cells.push(r[x]||makeCell(' '))}state.docName=f.name;state.selection=null;rebuildGrid();buildGlyphColourPanel();state.dirty=false;updateTitle();setMessage('HTML imported')}catch(err){alert('Could not import HTML: '+err.message)}e.target.value=''}
+function exportHtml(){const lines=[];for(let y=0;y<state.rows;y++){let out='',run=null,buf='';const flush=()=>{if(!buf)return;const resolved=resolveGlyphColour(run.ch);out+=`<span style="color:${resolved.fg};background-color:${resolved.bg};font-family:${JSON.stringify(run.font)};font-weight:${run.bold?700:400};font-style:${run.italic?'italic':'normal'};text-decoration:${run.underline?'underline':'none'}">${escapeHtml(buf)}</span>`;buf=''};for(let x=0;x<state.cols;x++){const c=getCell(x,y);if(!run||run.ch!==c.ch){run={ch:c.ch,font:c.font,bold:c.bold,italic:c.italic,underline:c.underline};buf=''}buf+=c.ch}flush();lines.push(out)}const html=`<!doctype html><html><head><meta charset="utf-8"><title>GlyphPoint export</title><style>html,body{margin:0;background:#000;color:#fff}body{display:grid;place-items:center;min-height:100vh;padding:20px}pre{margin:0;font:700 10px/8px "Cascadia Mono",Consolas,monospace;white-space:pre;font-variant-ligatures:none;letter-spacing:0}span{text-shadow:0 0 2.6px currentColor}</style></head><body><pre id="art">${lines.join('\n')}</pre></body></html>`;downloadBlob(html,'text/html','glyphpoint-export.html');setMessage('HTML exported')}
+function escapeHtml(s){return s.replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]))}
+function downloadBlob(data,type,name){const blob=data instanceof Blob?data:new Blob([data],{type}),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),2000)}
+function openProperties(){const d=$('#propertiesDialog');$('#propW').value=state.cols;$('#propH').value=state.rows;$('#propBg').value=state.fieldBg;$('#transparentSelect').checked=state.transparentSelect;d.showModal()}
+function applyProperties(){const w=+$(`#propW`).value,h=+$(`#propH`).value;state.fieldBg=$('#propBg').value;if($('#fieldBgInput'))$('#fieldBgInput').value=state.fieldBg;state.transparentSelect=$('#transparentSelect').checked;$('#transparentRibbon').checked=state.transparentSelect;renderAll();if(w!==state.cols||h!==state.rows){snapshot();const old=state.cells,oc=state.cols,or=state.rows;state.cols=w;state.rows=h;state.cells=Array.from({length:w*h},(_,i)=>{const [x,y]=[i%w,Math.floor(i/w)];return x<oc&&y<or?deepCell(old[y*oc+x]):makeCell(' ')});state.selection=null;rebuildGrid();markDirty()}$('#propertiesDialog').close()}
+function openHelp(){const h=$('#helpBody');h.innerHTML=`<p><b>Tools</b><br>Pencil, fill, text, eraser, glyph picker, magnifier, rectangular/free-form selection, crop, resize/skew, rotate/flip and scalable shapes.</p><p><b>Brushes</b><br>Brush size applies to Pencil and Eraser. Tip presets include circle, square, and fixed 1:3, 3:1, 1:5 and 5:1 rectangular brushes. The ratio presets scale with brush size and are brushes, not draggable shapes.</p><p><b>Glyph palette</b><br>Two glyph slots: <b>1</b> (primary) is used by the left mouse button, <b>2</b> (secondary) by the right mouse button. Click <b>Edit</b> to replace, add or remove palette entries. Palette changes are stored locally in this browser and survive reloads; <b>Reset</b> restores the defaults.</p><p><b>Clipboard</b><br><span class="kbd">Ctrl+C</span> copy &nbsp; <span class="kbd">Ctrl+X</span> cut &nbsp; <span class="kbd">Ctrl+V</span> paste &nbsp; <span class="kbd">Delete</span> clear selection.</p><p><b>History</b><br><span class="kbd">Ctrl+Z</span> undo &nbsp; <span class="kbd">Ctrl+Y</span> redo.</p><p><b>Files</b><br>The File button in the title bar opens/saves GlyphPoint JSON, imports/exports plain text or coloured HTML, and provides properties, print and help.</p><p><b>Shapes</b><br>Stroke styles: <b>Glyph</b>, <b>Lines</b> (box-drawing), or <b>None</b>. Fills use the selected fill glyph. Arrows scale their head to the shorter side and stretch their tail. Hold <span class="kbd">Shift</span> to lock shapes and lines to 1:1.</p><p><b>View</b><br>View controls are always present in both interfaces: zoom, gridlines, rulers, status bar, square cells, field background and full screen.</p><p><b>Interfaces</b><br>The title-bar mode button switches between the compact ribbon and Win98-style side panel. Both operate the same document state and tools.</p>`;$('#helpDialog').showModal()}
+
+
+function keyboard(e){const mod=e.ctrlKey||e.metaKey;if(mod&&e.key.toLowerCase()==='z'){e.preventDefault();undo()}else if(mod&&e.key.toLowerCase()==='y'){e.preventDefault();redo()}else if(mod&&e.key.toLowerCase()==='c'){e.preventDefault();copySelection()}else if(mod&&e.key.toLowerCase()==='x'){e.preventDefault();cutSelection()}else if(mod&&e.key.toLowerCase()==='v'){e.preventDefault();pasteSelection()}else if(mod&&e.key.toLowerCase()==='n'){e.preventDefault();handleFile('new')}else if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();saveProject()}else if(mod&&e.key.toLowerCase()==='p'){e.preventDefault();window.print()}else if(e.key==='Delete'&&state.selection){deleteSelection()}else if(e.key==='Escape'){closeColourPicker()}else if(e.key==='+'||e.key==='='){setZoom(state.zoom+.25)}else if(e.key==='-'){setZoom(state.zoom-.25)}}
+
+init();
+</script>
+</body>
+</html>

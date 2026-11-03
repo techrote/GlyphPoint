@@ -75,6 +75,11 @@ async function runRendererBrowser(browserName) {
         testState = {...testState, cols: 3, rows: 2, zoom: 1, square: true, glyphPalette: [{glyph: 'A', colour: '#112233'}],
           cells: [{...base, ch: 'A', fg: '#ff0000', bg: '#0000ff'}, {...base, ch: 'A', fg: '#00ff00'}, {...base, ch: '👨‍👩‍👧‍👦', bg: '#121314'},
             {...base, ch: 'Á', bold: true, italic: true, underline: true}, {...base, ch: '漢'}, {...base, ch: ' ', bg: '#445566'}]};
+        // For pixel-exact parity, viewport and export must rasterize at the same
+        // integer canvas origin. WebKit's glyph antialiasing depends on the
+        // absolute device position; padding/scroll geometry is tested separately.
+        const scroll = document.querySelector('#scroll');
+        scroll.style.padding = '0'; scroll.scrollLeft = 0; scroll.scrollTop = 0;
         const canvas = document.querySelector('#art'), ctx = canvas.getContext('2d'), drawn = [];
         const realFillText = ctx.fillText.bind(ctx);
         ctx.fillText = (text, ...args) => { drawn.push(text); return realFillText(text, ...args); };
@@ -85,7 +90,8 @@ async function runRendererBrowser(browserName) {
         await document.fonts.ready;
         await testRenderer.whenIdle();
         const m = testRenderer.metrics(), width = m.cols * m.cellWidth, height = m.rows * m.cellHeight;
-        const art = ctx.getImageData(m.originX, m.originY, width, height).data;
+        if (m.originX !== 0 || m.originY !== 0) throw Error(`Pixel parity requires origin (0,0), received (${m.originX},${m.originY})`);
+        const art = ctx.getImageData(0, 0, width, height).data;
         // Separate export painting from PNG serialization and decoded-image colour handling.
         const originalToBlob = HTMLCanvasElement.prototype.toBlob;
         let beforeEncoding = null, blob;

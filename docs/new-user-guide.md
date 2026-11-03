@@ -66,7 +66,7 @@ A new document is **80 × 80 cells**. Each cell contains one Unicode grapheme: a
 
 The slots marked **1** and **2** show the primary and secondary glyphs. Outside palette Edit mode:
 
-- Click a tile to select primary, or right-click to select secondary. With **Use secondary glyph** switched on, an ordinary tap selects secondary instead. Keyboard users can focus a tile and press Enter or Shift+Enter.
+- Click a tile to select primary, or right-click to select secondary. With **Use secondary glyph** switched on, an ordinary tap selects secondary instead. Keyboard users can focus a tile, move between adjacent palette tiles with Left/Right Arrow, and press Enter or Shift+Enter. On macOS, whether Tab visits buttons is controlled by the system/browser keyboard-navigation setting.
 - Pencil and Flood fill use the primary glyph with the normal mouse button; the other mouse button or **Use secondary glyph** selects the secondary drawing choice.
 - **Colours…** changes palette defaults. All `#` cells that inherit their foreground change together when you change `#`'s palette colour.
 - **Cell colours** creates exceptions: one `#` can be red while another is blue. A custom background can colour even a space cell.

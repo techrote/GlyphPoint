@@ -644,7 +644,7 @@ Choose **Focus field**, click the field, or Tab to **GlyphPoint editable field**
 | Delete / Backspace | Clear the selection or, without a selection, the active cell. |
 | Tab | Leave the field for the next focusable control. |
 
-Palette tiles accept **Enter** or **Space** to choose the primary glyph, and **Shift+Enter** or **Shift+Space** to choose secondary. In palette Edit mode, these keys open the entry dialog. The editor does not provide letter-key shortcuts for each drawing tool; Tab to the named tool buttons to choose them.
+Palette tiles accept **Enter** or **Space** to choose the primary glyph, and **Shift+Enter** or **Shift+Space** to choose secondary. **Left/Right Arrow** moves focus between adjacent palette tiles without changing the active glyph; the first and last tiles are boundaries rather than a focus trap. In palette Edit mode, Enter or Space opens the entry dialog. Tab uses native browser/operating-system focus policy: Safari on macOS can skip buttons unless the user enables full keyboard navigation. The editor does not provide letter-key shortcuts for each drawing tool; use the named controls to choose tools.
 
 For a complete selectable representation, choose **File → Readable text / copy all…**. The text area contains all rows, not only the visible viewport. **Copy all** uses the system clipboard when available and otherwise selects the text for your system Copy command. **Export text** creates a plain-text file. Individual colours and style information remain available in project JSON/HTML and the focused-cell description, rather than in this plain-text view.
 

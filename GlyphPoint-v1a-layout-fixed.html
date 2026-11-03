@@ -2444,7 +2444,15 @@ function buildGlyphPalette(){
     b.textContent=displayGlyph(ch);b.setAttribute('aria-label',`Glyph ${displayGlyph(ch)}; Enter selects the active slot; Shift+Enter selects secondary`);
     // Native/assistive button activation uses click, without depending on a
     // preceding pointer event. Explicit key handling retains Shift selection.
-    b.onclick=()=>activate(false);b.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();activate(e.shiftKey)}};
+    b.onclick=()=>activate(false);b.onkeydown=e=>{
+      // Native Tab behavior varies with browser/OS full-keyboard-access settings.
+      // Give focused palette tiles a consistent, non-trapping previous/next route.
+      if(e.key==='ArrowRight'||e.key==='ArrowLeft'){
+        e.preventDefault();
+        const neighbour=e.key==='ArrowRight'?b.nextElementSibling:b.previousElementSibling;
+        if(neighbour?.matches('.gp-btn[data-g]'))neighbour.focus();
+      }else if(e.key==='Enter'||e.key===' '){e.preventDefault();activate(e.shiftKey)}
+    };
     b.oncontextmenu=e=>{e.preventDefault();if(state.paletteEditing)removePaletteGlyph(i);else setSecondaryGlyph(ch)};
     b.title=state.paletteEditing?'Edit this palette glyph; right-click removes it':`Select active slot: click · Secondary: right click — ${ch===' '?'space':ch}`;
     b.style.color=glyphFg(ch);b.style.background=/^\s$/u.test(ch)?state.fieldBg:paletteContrast(glyphFg(ch));

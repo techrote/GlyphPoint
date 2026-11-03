@@ -258,12 +258,17 @@ async function runBrowser(browserName) {
       await a.focus();await page.keyboard.press('Enter');
       assert.equal((await documentState(page)).glyphPrimary,'A');
       assert.equal(await a.evaluate(button=>document.activeElement===button),true,'Selection retains the focused button');
-      await page.keyboard.press('Tab');
-      assert.equal(await b.evaluate(button=>document.activeElement===button),true,'Tab continues from the chosen glyph');
+      // Safari on macOS may omit ordinary buttons from the native Tab sequence
+      // unless Full Keyboard Access is enabled. Arrows work in every engine.
+      await page.keyboard.press('ArrowRight');
+      assert.equal(await b.evaluate(button=>document.activeElement===button),true,'Right arrow focuses the next glyph');
+      await page.keyboard.press('ArrowLeft');
+      assert.equal(await a.evaluate(button=>document.activeElement===button),true,'Left arrow focuses the preceding glyph');
+      await page.keyboard.press('ArrowRight');
       await page.keyboard.press('Shift+Enter');
       assert.equal((await documentState(page)).glyphSecondary,'B');
       assert.equal(await b.evaluate(button=>document.activeElement===button),true);
-      await page.keyboard.press('Tab');await page.keyboard.press('Shift+Space');
+      await page.keyboard.press('ArrowRight');await page.keyboard.press('Shift+Space');
       assert.equal((await documentState(page)).glyphSecondary,'<');
       assert.equal(await page.locator('#glyphPalette [data-g="<"]').evaluate(button=>document.activeElement===button),true);
       await page.locator('#secondaryToggle').click();
@@ -499,7 +504,14 @@ async function runBrowser(browserName) {
       await page.locator('#panToggle').tap();
       await assertMobileLayout(page,'Pan controls');
       const before=await documentState(page),box=await page.locator('#scroller').boundingBox();
-      const start={x:box.x+box.width*.8,y:box.y+box.height*.8},end={x:box.x+box.width*.3,y:box.y+box.height*.3};
+      // Start on a known canvas cell rather than an arbitrary point in the
+      // scroll area: the latter can be blank padding on some engine/viewport
+      // combinations, where the canvas correctly does not receive pointerdown.
+      const start=await cellCentre(page,10,10);
+      const end={x:Math.max(box.x+12,start.x-130),y:Math.max(box.y+12,start.y-130)};
+      assert.ok(await page.evaluate(({x,y})=>renderer.hitTest(x,y),start),'Pan gesture begins over a rendered cell');
+      assert.equal(await page.locator('#panToggle').getAttribute('aria-pressed'),'true');
+      const initialScroll=await page.locator('#scroller').evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}));
       if(browserName==='chromium'){
         // Chromium exposes native touch dragging through its browser protocol.
         const input=await context.newCDPSession(page);
@@ -515,7 +527,8 @@ async function runBrowser(browserName) {
       }
       await page.evaluate(()=>renderer.whenIdle());
       const scroll=await page.locator('#scroller').evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}));
-      assert.ok(scroll.x>0||scroll.y>0,'Pan mode scrolls the field');
+      assert.ok(scroll.x>initialScroll.x+1||scroll.y>initialScroll.y+1,
+        `Pan mode scrolls from a drawable cell (${JSON.stringify({initialScroll,scroll,start,end})})`);
       assert.deepEqual(await documentState(page),before,'Panning leaves artwork unchanged');
       assert.equal(await page.locator('#canvasGrid').evaluate(el=>getComputedStyle(el).touchAction),'none');
       await page.locator('#uiModeToggle').tap();

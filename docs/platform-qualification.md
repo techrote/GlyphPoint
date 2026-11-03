@@ -112,6 +112,7 @@ With TalkBack enabled, test discoverable control names, state announcements, mod
 | KEY-05 | Enter text, type a multi-code-point grapheme, apply, then edit a normal input. | Grid text entry works; input editing and IME composition keep native behavior. |
 | KEY-06 | Modifier+A/C/X/V/Z/Shift+Z/Y/S inside the grid and inside text inputs. | Grid shortcuts work in the field; ordinary input shortcuts are not hijacked. |
 | KEY-07 | Open Cell colours, Recovery, Properties, and Readable text using the keyboard. | Names/labels, required controls, error/status text, closing, and return focus are usable. |
+| KEY-08 | Focus a palette glyph, move Left/Right, choose primary with Enter and secondary with Shift+Enter, then Tab out. | Focus remains visible; adjacent glyphs are reachable without a trap. Record macOS Safari Full Keyboard Access/Tab-to-button settings separately. |
 | AT-01 | Read the focused grid cell and move to a selected or styled cell. | Role, row/column, glyph or label, foreground/background, and selection information are meaningful. |
 | AT-02 | Read/copy/export the complete document through Readable text. | Every row is available in a native text control without thousands of DOM cells. |
 | AT-03 | Trigger recovery pending/saved/error and long-operation completion/cancellation. | Status changes are available without relying solely on colour, transient animation, or a tooltip. |

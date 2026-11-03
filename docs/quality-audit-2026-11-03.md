@@ -1,5 +1,7 @@
 # GlyphPoint quality audit — 3 November 2026
 
+**Historical report:** this records the first maintenance pass. The subsequently requested recovery, Canvas renderer, v3 graphemes/cell colours, geometry, platform, and release work is tracked in [the implementation follow-up](quality-followup-2026-11-03.md). Its implementation supersedes the corresponding limitations below; the original evidence remains intact.
+
 ## Outcome and scope
 
 The baseline had useful drawing and palette features, but several data-loss and input-handling defects made its save/export and editing workflows unreliable. This maintenance pass repairs the reproduced defects, establishes one maintained file, adds executable regression coverage and CI, and documents both user and development contracts. It does not declare a production release or universal browser certification.

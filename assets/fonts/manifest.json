@@ -1,0 +1,30 @@
+{
+  "source": "DejaVu fonts 2.37, Debian fonts-dejavu-core; https://dejavu-fonts.github.io/",
+  "conversion": "fontTools WOFF container compression; outlines and names unchanged",
+  "fonts": [
+    {
+      "font": "DejaVuSansMono",
+      "sourceSha256": "c805f9436dbc268644c1d9584f01a601a653e028e08fd74b9b949f6cf8304d88",
+      "woffSha256": "a6d53633d49cfe8ab4d51b7caa8faa7e5a3f9cf2f85262416c0dc4fcac2a189e",
+      "bytes": 202180
+    },
+    {
+      "font": "DejaVuSansMono-Bold",
+      "sourceSha256": "3a3c502eeff669a231549e80df9f7c49de109bafe303170409e905d0b31a38fe",
+      "woffSha256": "490272fd25bc43f9d375716d56e00b93e6c82b3aaf3b9532ee026aaaf4c1c5a1",
+      "bytes": 199796
+    },
+    {
+      "font": "DejaVuSansMono-Oblique",
+      "sourceSha256": "3d7955616e69721f7edb8e1b7a580f8fbd7d737111c6b54266ddc1d9ef13202f",
+      "woffSha256": "8c1cbbaa02f9fa1f1f005531459cc5ed7bcfd5eb88d8eab9d1313e8ef5fa05ff",
+      "bytes": 150432
+    },
+    {
+      "font": "DejaVuSansMono-BoldOblique",
+      "sourceSha256": "a5251173370e30760e6919711dcd33e149d216ca4814eb74332bda03fcc7e834",
+      "woffSha256": "44641730ff4914f63462195dc9631b6090d95548b3341ee7356e14eaac612a55",
+      "bytes": 151656
+    }
+  ]
+}

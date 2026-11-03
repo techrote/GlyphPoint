@@ -135,6 +135,7 @@ function createEditor(options = {}) {
     activeElement: null,
     querySelector(selector) {
       if (/^#[\w-]+$/.test(selector)) return element(selector.slice(1));
+      if (selector === '.ribbonwrap') return element('ribbonwrap');
       if (selector === 'dialog[open]') {
         return [...elements.values()].find(el => el.matches(selector)) || null;
       }
@@ -156,7 +157,7 @@ function createEditor(options = {}) {
       setItem: (key, value) => storage.set(key, String(value)),
       removeItem: key => storage.delete(key),
     },
-    Blob, URL, TextEncoder, TextDecoder,
+    Blob, URL, TextEncoder, TextDecoder, AbortController,
     setTimeout, clearTimeout,
     requestAnimationFrame: callback => callback(),
     cancelAnimationFrame() {},
@@ -173,7 +174,7 @@ function createEditor(options = {}) {
   };
   sandbox.window = sandbox;
   const context = vm.createContext(sandbox);
-  const filename = options.filename || process.env.GLYPHPOINT_APP || path.join(__dirname, '..', 'GlyphPoint-v1a-layout-fixed.html');
+  const filename = options.filename || process.env.GLYPHPOINT_APP || path.join(__dirname, '..', 'GlyphPoint-RC.html');
   const html = fs.readFileSync(filename, 'utf8');
   const match = html.match(/<script\b[^>]*>([\s\S]*?)<\/script>/i);
   if (!match) throw new Error(`No inline application script in ${filename}`);
@@ -189,6 +190,7 @@ function createEditor(options = {}) {
     renderPreview = function() {};
     renderRulers = function() {};
     buildGlyphPalette = function() {};
+    updateGlyphSlots = function() {};
     buildGlyphColourPanel = function() {};
     renderGlyphColourManager = function() {};
     updateClassicOverflow = function() {};

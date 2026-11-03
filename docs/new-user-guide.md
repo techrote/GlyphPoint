@@ -1,33 +1,35 @@
 # GlyphPoint: new-user guide
 
-GlyphPoint is a desktop-browser editor for pictures made from characters. You paint on a grid, choose a colour for each glyph, add text and shapes, and save the result as a project, plain text, or a viewable HTML page. It runs from one HTML file; the editor does not require an account or a server.
+GlyphPoint makes pictures from a grid of characters. Paint with letters and symbols, colour individual cells, add text and shapes, and keep an editable project. It runs from one offline HTML file with an included font, automatic local recovery, keyboard editing, and mouse/touch controls. No account, build tools, or server are required to start.
 
-This guide uses **`GlyphPoint-v1a-layout-fixed.html`**, the maintained editor. The other versioned HTML files in the repository are historical snapshots. For a complete description of the controls, see the [instruction manual](manual.md). The [repository overview](../readme.md) links the remaining documentation, including [agent working instructions](../AGENTS.md) for development.
+This guide uses **`GlyphPoint-RC.html`**, the maintained editor. Other versioned HTML files are historical snapshots. Use the [instruction manual](manual.md) for the complete reference and the [repository overview](../readme.md) for development documentation, including [agent working instructions](../AGENTS.md).
 
 ## Contents
 
-- [Get the editor](#get-the-editor) — Download the maintained HTML file and open it locally.
-- [Understand the workspace](#understand-the-workspace) — Learn the grid, glyph palette, and two interface layouts.
-- [Make your first drawing](#make-your-first-drawing) — Create a small frame, paint inside it, and add a caption.
-- [Save and reopen your work](#save-and-reopen-your-work) — Keep an editable project and check the saved file.
-- [Share the result](#share-the-result) — Choose HTML for a viewable picture or text for characters alone.
-- [Choose what to learn next](#choose-what-to-learn-next) — Continue with selection, transforms, and palette management.
-- [If something goes wrong](#if-something-goes-wrong) — Resolve common first-run and download problems.
+- [Get the editor](#get-the-editor) — Download and open the maintained HTML file.
+- [Understand the workspace](#understand-the-workspace) — Learn cells, palette defaults, individual colours, and layouts.
+- [Make your first drawing](#make-your-first-drawing) — Draw a frame, colour a detail, and add a caption.
+- [Use keyboard or touch](#use-keyboard-or-touch) — Edit and navigate without relying on a right mouse button.
+- [Save and reopen your work](#save-and-reopen-your-work) — Choose a project destination or download a portable copy.
+- [Recover after a reload](#recover-after-a-reload) — Restore a local automatic checkpoint.
+- [Share the result](#share-the-result) — Choose editable JSON, viewable HTML, fixed PNG, or text.
+- [Choose what to learn next](#choose-what-to-learn-next) — Continue with selections, transforms, and palette management.
+- [If something goes wrong](#if-something-goes-wrong) — Resolve common first-run, save, and recovery problems.
 
 ## Get the editor
 
 1. Open the [GlyphPoint repository](https://github.com/techrote/GlyphPoint).
-2. Choose **Code → Download ZIP**, then extract the ZIP. Alternatively, open `GlyphPoint-v1a-layout-fixed.html` in GitHub and use **Download raw file**.
-3. Open the downloaded `GlyphPoint-v1a-layout-fixed.html` with your desktop browser. Double-clicking it usually opens the browser associated with HTML files. You can also use your browser's **Open File** command.
-4. Check that you see **GlyphPoint**, a tool area, and a blank grid. If you see HTML source or the GitHub file viewer, you have not opened the downloaded editor yet.
+2. Choose **Code → Download ZIP**, then extract the ZIP. Alternatively, open `GlyphPoint-RC.html` in GitHub and choose **Download raw file**.
+3. Open the downloaded HTML file in a current browser. Double-clicking usually opens the associated browser; its **Open File** command is another option.
+4. Check that you see **GlyphPoint**, tools, and a blank grid. A GitHub source viewer or a page of HTML text is not the running editor.
 
-Keep the original filename when downloading: some operating systems hide extensions, so check that the file has not become `.html.txt`.
+Keep the `.html` extension. Some operating systems hide extensions, so check that the file has not become `.html.txt`.
 
-The file contains its own interface, scripts, and styles. After downloading it, you can use the editor without a network connection. Fonts come from the fonts installed on your computer; no particular optional font is required to start.
+The file contains its interface, JavaScript, styles, and the regular/bold/italic faces of **DejaVu Sans Mono**. You can use it offline after downloading. Glyphs outside that font's coverage and other font choices can use the browser's installed-font fallback.
 
 ### Optional: use a local web server
 
-A local server is useful when your browser restricts clipboard access from a `file:` page. It is not needed for ordinary drawing or project downloads. If Python is already installed, open a terminal **in the extracted repository folder** and run one of these commands:
+A consistent localhost address can help with browser storage and clipboard permissions. It is optional for drawing and downloads. If Python is installed, open a terminal **in the repository folder** and run:
 
 Windows:
 
@@ -41,35 +43,36 @@ Linux or macOS:
 python3 -m http.server 8000 --bind 127.0.0.1
 ```
 
-Then open [http://127.0.0.1:8000/GlyphPoint-v1a-layout-fixed.html](http://127.0.0.1:8000/GlyphPoint-v1a-layout-fixed.html). Leave the terminal running while you use that address; press `Ctrl+C` in the terminal to stop the server.
+Open [http://127.0.0.1:8000/GlyphPoint-RC.html](http://127.0.0.1:8000/GlyphPoint-RC.html). Leave the terminal running while using that address; press `Ctrl+C` there to stop it. The server serves the editor file and does not receive your artwork.
 
-The `file:` copy and the local-server copy can have separate browser preferences. Switching between them does not move unsaved artwork; use a project file to transfer it.
+Use the same browser, profile, address, and port when you want the same recovery archive. A local `file:` copy, localhost copy, different browser, or private window can have separate storage. Use a JSON project to move artwork between them.
 
 ## Understand the workspace
 
-You start with an **80 × 80 cell** document. Each cell contains one character and its text styling. This is a character grid, so drawing with `#` places literal `#` characters rather than painting bitmap pixels.
+A new document is **80 × 80 cells**. Each cell contains one Unicode grapheme: a character or a joined sequence such as `é` or `👨‍👩‍👧‍👦`. The editor keeps that sequence together in one cell. It is still a character grid: drawing with `#` places literal `#` characters.
 
-The main controls are:
-
-| Area | What you use it for |
+| Area | What it does |
 | --- | --- |
-| **File** at the top left | New documents, open/save, exports, properties, print, and help. |
-| Tool buttons | Pencil, Flood fill, Text, Eraser, Glyph picker, and Magnifier. Hover over an icon for its name. |
-| Glyph palette | Choose the character you draw with and manage its colour. |
-| Shapes | Drag lines, rectangles, ellipses, triangles, diamonds, and arrows. |
-| Selection controls | Select, copy, cut, paste, move, crop, and resize. |
-| View controls and status bar | Zoom, gridlines, rulers, square cells, and document dimensions. |
+| **File** | New/open/save, recovery, exports, properties, print, and help. |
+| Tool buttons | Pencil, Flood fill, Text, Eraser, Glyph picker, and Magnifier. |
+| Glyph palette | Chooses primary/secondary glyphs and their default colours. |
+| Shapes | Draws lines, rectangles, ellipses, triangles, diamonds, and arrows. |
+| Selection controls | Selects, copies, cuts, pastes, moves, crops, and transforms. |
+| **Cell colours** | Sets custom foreground/background colours for individual cells or upcoming strokes. |
+| **Focus field**, **Use secondary glyph**, **Pan field** | Provides keyboard focus, secondary drawing, and drag-to-scroll navigation. |
+| Status bar | Shows dimensions, messages, zoom, and recovery status. |
 
-The mode button at the top right offers **Classic** when you are in the ribbon layout, and **Ribbon** when you are in the classic sidebar layout. It names the layout you will switch **to**. Both layouts operate on the same artwork.
+**Classic** switches from the top ribbon to a left sidebar; **Ribbon** switches back. The button names the destination layout. Both use the same document and tools. Scroll the ribbon or sidebar when controls extend beyond the available space.
 
-The glyph slots marked **1** and **2** are your primary and secondary glyphs. Outside palette-edit mode:
+The slots marked **1** and **2** show the primary and secondary glyphs. Outside palette Edit mode:
 
-- **Left-click a palette tile** to choose the primary glyph; draw with the left mouse button.
-- **Right-click a palette tile** to choose the secondary glyph; Pencil, Flood fill, and Glyph-mode shape outlines can use it with the right mouse button.
-- Choose **Colours…** to change glyph colours. A glyph has one colour throughout the document: changing the colour of `#` changes every `#` already drawn.
-- **Background** changes the whole field background. A blank cell shows that background.
+- Click a tile to select primary, or right-click to select secondary. With **Use secondary glyph** switched on, an ordinary tap selects secondary instead. Keyboard users can focus a tile, move between adjacent palette tiles with Left/Right Arrow, and press Enter or Shift+Enter. On macOS, whether Tab visits buttons is controlled by the system/browser keyboard-navigation setting.
+- Pencil and Flood fill use the primary glyph with the normal mouse button; the other mouse button or **Use secondary glyph** selects the secondary drawing choice.
+- **Colours…** changes palette defaults. All `#` cells that inherit their foreground change together when you change `#`'s palette colour.
+- **Cell colours** creates exceptions: one `#` can be red while another is blue. A custom background can colour even a space cell.
+- **Background** changes the field's default; cells with custom backgrounds keep their own colours.
 
-The palette holds up to **4,096 entries including one reserved space**, leaving room for at most **4,095 other glyphs**. Space cannot be removed or renamed, even when the current drawing contains no blank cells. Palette Reset keeps glyphs used in your drawing, restores their default colours, and adds the built-in defaults where capacity remains; the usual `#` / `+` slot choices can fall back to an available entry in a full palette.
+**Edges → Expand to fit** starts selected. Pasting, moving a selection, placing text, and rotating a selection can grow the field to keep the result. Choose Reject or Clip only when you intend those behaviours. Brushes and shape footprints remain bounded by the existing field.
 
 ## Make your first drawing
 
@@ -79,81 +82,119 @@ The palette holds up to **4,096 entries including one reserved space**, leaving 
 2. Set **Width (cells)** to `40` and **Height (cells)** to `20`.
 3. Keep the background black and choose **OK**.
 
-Properties changes the size of the field while keeping existing cells at the top left. **Resize** is a different command that scales existing artwork; you do not need it for this first exercise.
+Properties adds or removes field boundaries while keeping existing cells at the top left. **Resize** scales the artwork itself; you do not need it for this exercise. If shrinking would discard existing artwork, Properties asks before proceeding.
 
 ### Draw a frame
 
-1. Left-click `#` in the palette.
-2. Choose the **Rectangle** shape. Hover over the shape icons to find its name.
-3. Set **Stroke** to **Glyph**, **Fill** to **None**, and **Width** to `1`.
-4. Drag from near the upper-left corner of the field to near the lower-right corner, leaving a small margin.
-5. Release the mouse button to commit the rectangle.
+1. Select `#` in the palette.
+2. Choose the **Rectangle** shape. Hover over an icon, or focus it, to identify the named control.
+3. Set **Stroke → Glyph**, **Fill → None**, and **Width → 1**.
+4. Drag from near the upper-left to near the lower-right of the field, leaving a small margin.
+5. Release to commit the rectangle.
 
-The preview shows the shape's bounds. If the result is not where you wanted it, choose **Undo** in the title bar or press `Ctrl+Z`, then draw it again.
+Use **Undo**, `Ctrl+Z`, or `Command+Z` if you want to try again. Watch the recovery status change from pending to saved after an edit.
 
 ### Paint and recolour
 
 1. Choose **Pencil** and leave **Size** at `1`.
-2. Choose a different glyph, such as `+`, and draw a few marks inside the frame.
-3. Open **Colours…**. Find the row for `+`, then choose a colour with its colour swatch or enter a six-digit hex value such as `#ffcc00`.
-4. Choose **Close** when you are done. The marks change together because colour belongs to the glyph.
+2. Select `+` and draw a few marks inside the frame.
+3. Open **Colours…**, find the row for `+`, and choose a colour or enter a six-digit hex value such as `#ffcc00`.
+4. Close the manager. The inherited `+` marks change together.
+5. Click a `+` cell to focus it, or select a group of cells. Choose **Cell colours**.
+6. Set **Foreground → Custom cell colour**, choose another colour, and choose **Apply to cells**. The selected cells keep the new colour independently of the palette.
 
-Use **Eraser** to replace cells with spaces. If you choose **Flood fill**, click an area containing the same character to replace the connected region. Flood fill matches characters, so filling the blank interior of your frame is different from filling the `#` outline.
+Applying cell colours also updates the colours for upcoming strokes. To resume palette-based drawing, open **Cell colours**, choose **Inherit glyph palette** and **Inherit field background**, then choose **Use for next strokes**. To remove existing overrides, select those cells and choose **Apply to cells** instead.
+
+**Eraser** writes ordinary spaces and clears colour/style overrides. **Flood fill** replaces a four-way connected region with matching glyph and foreground/background settings. It shows progress and offers **Cancel operation**; cancelling leaves the document unchanged.
 
 ### Add a caption
 
-1. Choose **Text**, then click the cell where the caption should begin.
+1. Choose **Text** and click its starting cell. Keyboard users can focus the desired cell and press Enter.
 2. Type `HELLO` in the dialog.
-3. Leave **Scale** at **1×** for ordinary one-character-per-cell text.
+3. Leave **Font → DejaVu Sans Mono (embedded)** and **Scale → 1×**.
 4. Choose **Place text**.
 
-Typed characters use their own entries in the glyph palette. Characters newly introduced to the document start with a default colour; you can adjust them through **Colours…**. The Text font and style controls apply to the text you are placing.
+At 1×, each grapheme occupies one cell. Scale 2× or 3× repeats it into a block of cells; it does not enlarge the outline of a letter. The font and bold/italic/underline controls affect the placed cells.
+
+Text follows the brush colours. With foreground inheritance, each letter uses its own palette entry; a custom brush foreground can give the whole caption one colour. Transparent text skips spaces, while Opaque places spaces and records the chosen background. Expand-to-fit keeps a caption that crosses an edge, provided the enlarged field stays within the document limits.
+
+## Use keyboard or touch
+
+Choose **Focus field** to begin keyboard editing. Arrow keys move one cell; Shift+Arrow extends a rectangular selection. Press Space to paint, Shift+Space to use secondary, Enter for text, and Delete to clear the selection or focused cell. Home/End move within the row; Ctrl/Command+Home/End reach document corners. Ctrl/Command+A selects all. Tab leaves the field.
+
+The focused cell exposes its row, column, glyph, colours, and optional palette label to assistive technology. **File → Readable text / copy all…** opens the complete field in a selectable text area, with copy and text-export controls. It includes offscreen rows, while colours and styles remain in the project and HTML exports.
+
+On touch, tap the named controls and drag to draw. Switch **Use secondary glyph** on, tap a palette tile to choose secondary, and draw with that choice. Switch it off to return to primary. Turn **Pan field** on to drag-scroll the artwork without painting, then turn it off to draw again. Tool layouts adapt to smaller viewports, and you can zoom the artwork separately from browser page zoom.
+
+These are implemented input paths. Automated browser/touch-emulation checks are distinct from physical device and screen-reader qualification; use the [manual's compatibility guidance](manual.md#limits-and-compatibility) for the evidence boundaries and reporting details.
 
 ## Save and reopen your work
 
-**Save a project before closing or reloading the editor. The drawing is not automatically saved to browser storage.**
+Automatic recovery is useful for accidents; a **JSON project file** is the copy you can name, move, back up, and reopen anywhere.
 
-1. Choose **File → Save project**, or use `Ctrl+S` when you are working on the canvas.
-2. The browser downloads **`glyphpoint-project.json`**. Check your Downloads folder or the location selected in the browser's save dialog.
-3. Rename that file to something meaningful, such as `first-drawing.glyphpoint.json`.
-4. To verify the saved copy, choose **File → Open GlyphPoint project…** and select that JSON file.
-5. Check the dimensions, text, colours, and cell appearance. Save another version when you make further changes you want to keep.
+1. Choose **File → Save project**, `Ctrl+S`, or `Command+S` outside a text field.
+2. If the browser offers a native file picker, choose a location and a name such as `first-drawing.glyphpoint.json`. After a successful write, later Saves write to that chosen destination for the current document. **Save project as…** chooses another.
+3. If the browser uses a download instead, confirm the JSON in its download list or selected folder. The browser may number repeated copies.
+4. **Download project JSON…** is always available when you deliberately want a downloaded copy. Save As is disabled when the native picker is unavailable.
+5. Choose **Open GlyphPoint project…**, select the intended JSON, and check the dimensions, caption, colours, and cell backgrounds.
 
-Saving downloads a file; it does not silently overwrite the file you opened. Your browser may append `(1)`, `(2)`, and so on to repeated download names. Open and retain the intended version.
+The title's asterisk clears only after a confirmed direct write of the current revision. A requested download leaves it visible because the editor cannot know whether you kept the file. Recovery checkpoints also leave it visible. A failed or cancelled Save never claims success.
 
-The project contains the field, cell contents and styles, palette, background, selected glyphs, and square-cell setting. Undo history is session-only. Palette preferences and the interface layout are stored separately in this browser when browser storage is available; those preferences are **not a backup of the drawing**.
+Opening a project does not grant permission to overwrite that file. Your first direct Save asks you to choose a destination; the chosen handle resets after New, another open, or reload. Save named versions before major crops, resizes, or palette changes.
 
-The editor warns before replacing unsaved work with a new document or imported file, and asks the browser to warn before leaving a dirty page. Those warnings are a final reminder, not an autosave facility. Keep a saved JSON copy.
+A project contains cells, graphemes, per-cell styles/colours, palette, field background, selected glyphs, and square-cell setting. Selection, clipboard, view zoom, and Undo history are session state. Current projects use v3; older v1/v2 projects open through a migration that preserves their appearance.
+
+## Recover after a reload
+
+After an edit, GlyphPoint normally stores a local checkpoint about **750 ms after editing pauses**, or schedules one within **five seconds** during continuous editing. Check for **Recovery saved** in the status bar. Storage failures appear explicitly.
+
+1. Reopen the editor at the same address in the same browser/profile.
+2. Choose **Recovery** or **File → Recovery checkpoints…**.
+3. Find the intended name, size, and timestamp, then choose **Recover**.
+4. Confirm replacement if needed, check the restored drawing, and save a project file.
+
+Recovery does not silently replace the startup canvas. It keeps the latest checkpoint for each tab/document session, with at most **12 entries**, **32 MiB total stored recovery payload**, and **16 MiB per entry**. Large repetitive canvases use lossless local recovery compression, while highly detailed ones may exceed the archive budget; keep a separate JSON backup. Older entries can be evicted. **Delete checkpoint** removes the archive entry after confirmation and does not delete a project file.
+
+Browser data clearing, private windows, quota limits, and separate origins can affect availability. A process that stops before a write completes can lose its newest changes. Keep file copies for important work and transfers; recovery does not include Undo history or synchronize across devices.
 
 ## Share the result
 
 | Goal | Choose | What the recipient needs |
 | --- | --- | --- |
-| Keep editing later | **File → Save project** | GlyphPoint and the JSON project file. |
-| Show the coloured artwork | **File → Export standalone HTML…** | A browser to open the downloaded HTML page. |
-| Copy characters into another text workflow | **File → Export plain text…** | A text editor or another program that accepts text. |
-| Produce a paper or PDF copy | **File → Print…** | The browser's print dialog and an available print/PDF destination. |
+| Continue editing | **Save project** / **Download project JSON…** | GlyphPoint and the project JSON. |
+| Show coloured artwork with a bundled font | **Export standalone HTML…** | A browser; native exports also retain embedded project data for reimport. |
+| Preserve this rendered appearance | **Export PNG image…** | Any image viewer. All rows are included, even when scrolled offscreen. |
+| Exchange characters alone | **Export plain text…** or **Readable text / copy all…** | A text editor or another text workflow. |
+| Paper or PDF copy | **Print…** | The browser's print dialog and chosen printer/PDF destination. |
 
-Plain text contains characters and line breaks only. It cannot store the glyph palette, colours, fonts, or styles. Keep the JSON project as your editable original even if you also export HTML or text.
+PNG and Print render the whole field without gridlines, selection outlines, or the active cursor. PNG captures font fallback as pixels, so the receiving device does not need the same fonts. HTML includes the embedded default font, but other font choices or uncovered emoji may still vary by device. Plain text has no colours or styles and may wrap differently elsewhere. Keep the JSON editing original alongside any shared result.
 
 ## Choose what to learn next
 
-- [Selections and the clipboard](manual.md#selections-and-the-clipboard): move a motif, make copies, and understand **Ignore blanks**.
-- [Shapes](manual.md#shapes): combine primary/secondary fills, line glyphs, and different stroke widths.
-- [The glyph palette](manual.md#the-glyph-palette) and [Glyph Colour Manager](manual.md#glyph-colour-manager): create a reusable vocabulary of glyphs and colours.
-- [Resize, skew, and properties](manual.md#resize-skew-and-properties): change the field dimensions or scale the artwork deliberately.
-- [File formats and exports](manual.md#file-formats-and-exports): understand what is preserved by each format.
+- [Selections and the clipboard](manual.md#selections-and-the-clipboard): copy motifs, choose edge policies, and understand Ignore blanks with painted backgrounds.
+- [Cell and brush colours](manual.md#cell-and-brush-colours): mix palette inheritance and individual colouring.
+- [Shapes](manual.md#shapes): combine primary/secondary fills, line glyphs, and stroke widths.
+- [The glyph palette](manual.md#the-glyph-palette) and [Glyph Colour Manager](manual.md#glyph-colour-manager): create a vocabulary of symbols, labels, and default colours.
+- [Resize, skew, and properties](manual.md#resize-skew-and-properties): distinguish field boundaries from resampling and choose expansion deliberately.
+- [File formats and exports](manual.md#file-formats-and-exports): learn what JSON, external HTML, text, and images preserve.
+
+The field supports **1–4,096 cells per axis** and **1,048,576 cells total**. A palette holds **4,096 graphemes including reserved space**, and each grapheme is limited to **32 code points**. JSON projects can be up to **256 MiB**; palette, text, and HTML imports are limited to **16 MiB**. Operations that exceed the limits are rejected before replacing the drawing.
 
 ## If something goes wrong
 
 | Symptom | What to try |
 | --- | --- |
-| GitHub shows source code | Download the raw HTML or the repository ZIP, then open the local HTML file. |
-| Tools do not fit | Scroll the ribbon horizontally, or switch to Classic and scroll its sidebar. You can also zoom the artwork separately from the browser page. |
-| A character looks like a box | Try an installed font that includes that character. Fonts differ between computers. |
-| Copy/paste to another app fails | Allow clipboard access if the browser asks, or try the optional localhost server. GlyphPoint's internal copy buffer remains useful within the editor. |
-| New or opened artwork looks blank | Check the field background and the glyph colour: identical colours can make a glyph invisible. Also check that you opened a project, not a palette-only JSON file. |
-| Reload lost the drawing | Reopen your last saved project. Browser palette preferences do not contain the canvas. |
-| You cannot find the save | Check the browser's download list and Downloads folder; repeated saves may have numbered filenames. |
+| GitHub shows source | Download the raw HTML or ZIP, then open the local editor file. |
+| Tools do not fit | Scroll the ribbon, switch to Classic, or resize the window. Use Pan field for touch navigation. |
+| A glyph looks like a box | Try the embedded font or an installed font that covers it; export PNG to preserve the appearance you can see. |
+| Palette colours do not change a cell | It has a custom foreground. Restore inheritance through Cell colours. |
+| Copy/paste to another app fails | Check clipboard permissions or try localhost. Readable text offers manual selection/copy, and internal copying retains styled cells. |
+| Save leaves an asterisk | A download cannot confirm completion, or newer edits happened during direct Save. Verify the JSON copy or save the newest revision. |
+| Save As is unavailable | Use Download project JSON; this context does not expose the native picker. |
+| Reload shows a blank field | Open Recovery and select the intended checkpoint, or reopen your latest saved project. |
+| Recovery reports unavailable/full | Save a project file, inspect the status detail, and check storage settings or old checkpoints. |
+| A placement is rejected | Check Expand/Reject/Clip and the field limits. Expand cannot create a field above the size budget. |
+| Touch dragging no longer draws | Turn off Pan field. |
+| You cannot find the saved copy | Check the native picker's chosen folder or the browser's download list and numbered filenames. |
 
-For more detail, use the [troubleshooting reference](manual.md#troubleshooting). If you report a problem, include the editor filename, browser version, exact steps, and a small project that demonstrates it when you can share one.
+Use the [troubleshooting reference](manual.md#troubleshooting) for more detail. A helpful problem report includes the editor filename/version, browser and operating system/device, input method, exact steps, and a small project you can safely share.

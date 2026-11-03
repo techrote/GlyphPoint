@@ -28,11 +28,35 @@ jobs:
           package-manager-cache: false
       - run: npm run check
       - run: npm test
+      - run: npm run release:package
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: GlyphPoint-candidate-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
 
   browsers:
-    name: Chromium and Firefox workflows
-    runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    name: Browser workflows (${{ matrix.label }})
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            label: Linux, three engines
+            engines: chromium firefox webkit
+            smoke: '0'
+          - os: windows-2022
+            label: Windows, Chromium smoke
+            engines: chromium
+            smoke: '1'
+          - os: macos-14
+            label: macOS, WebKit smoke
+            engines: webkit
+            smoke: '1'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -42,5 +66,7 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --ignore-scripts --no-fund --no-audit
-      - run: npx playwright install --with-deps chromium firefox
-      - run: npm run test:browser
+      - run: npx playwright install --with-deps ${{ matrix.engines }}
+      - run: npm run test:browser -- ${{ matrix.engines }}
+        env:
+          GP_RUN_SMOKE: ${{ matrix.smoke }}

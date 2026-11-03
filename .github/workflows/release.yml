@@ -1,0 +1,52 @@
+name: Prepare draft release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: glyphpoint-release
+  cancel-in-progress: false
+
+jobs:
+  draft:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Require selected project license and exact source qualification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test -s LICENSE || { echo 'The owner must select and commit the project LICENSE first.'; exit 1; }
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&event=push&per_page=100" --jq ".workflow_runs | any(.path == \".github/workflows/quality.yml\" and .head_sha == \"$GITHUB_SHA\" and .event == \"push\" and .conclusion == \"success\")" > /tmp/qualified
+          test "$(cat /tmp/qualified)" = true || { echo 'Quality must pass on this exact main commit before a draft release.'; exit 1; }
+      - run: npm run check
+      - run: npm test
+      - run: npm run release:package
+      - name: Create reviewable release candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          test -s "releases/v$VERSION.md"
+          EXISTING=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" --jq '.object.sha' 2>/dev/null || true)
+          if test -n "$EXISTING"; then
+            test "$EXISTING" = "$GITHUB_SHA" || { echo 'The version tag already exists at another object. Choose a new version.'; exit 1; }
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/tags/v$VERSION" -f "sha=$GITHUB_SHA"
+          fi
+          gh release create "v$VERSION" "dist/GlyphPoint-$VERSION.zip" "dist/GlyphPoint-$VERSION.zip.sha256" "dist/release-manifest.json" --repo "$GITHUB_REPOSITORY" --verify-tag --target "$GITHUB_SHA" --draft --prerelease --title "GlyphPoint $VERSION" --notes-file "releases/v$VERSION.md"

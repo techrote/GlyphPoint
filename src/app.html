@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GlyphPoint — Precision Glyph Grid Editor</title>
+<style id="embeddedFonts">
+/* GLYPHPOINT_FONTS */
+</style>
+<style>
+:root{
+  color-scheme:light;
+  --ui:#f3f4f6;--panel:#fff;--line:#c8ccd1;--line2:#dde0e4;--blue:#2b78d4;
+  --text:#202124;--muted:#666b72;--cell-fs:12px;--cell-lh:1em;--zoom:1;
+  --ui-font:"Segoe UI",Tahoma,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden}
+body{font:11px/1.2 var(--ui-font);color:var(--text);background:#cfd3d8}
+button,input,select,textarea{font:11px/1.15 var(--ui-font);color:inherit}
+button{cursor:pointer}svg{display:block}
+#app{height:100%;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:30px 96px minmax(0,1fr) 24px;background:#e7e9ec}
+.titlebar{grid-row:1;display:flex;align-items:center;gap:4px;padding:0 5px;background:#fff;border-bottom:1px solid #d4d7db;user-select:none;min-width:0}
+.appmark{width:18px;text-align:center;font:700 16px/1 "Cascadia Mono",Consolas,monospace;color:var(--blue)}
+.title{font-size:12px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.quick{display:flex;align-items:center;gap:2px}
+.quick button,.modeToggle,.titlebar .filebtn{height:22px;min-width:26px;border:1px solid transparent;background:transparent;border-radius:3px;padding:2px 6px;display:inline-flex;align-items:center;justify-content:center;gap:4px}
+.quick button:hover,.modeToggle:hover,.titlebar .filebtn:hover{background:#e8eef7;border-color:#bdcce0}
+.titlebar .filebtn{min-width:42px;background:#2878d0;color:#fff;border-color:#2878d0;margin-right:3px}.titlebar .filebtn:hover{background:#1f69ba;border-color:#1f69ba}
+.modeToggle{min-width:68px;font-size:10px}
+.ribbonwrap{grid-row:2;background:#f5f6f7;border-bottom:1px solid #bfc3c8;user-select:none;min-width:0;overflow:hidden}
+.ribbon{height:96px;display:flex;align-items:stretch;gap:0;padding:3px;overflow-x:auto;overflow-y:hidden;background:linear-gradient(#fafbfc,#f0f1f3)}
+.group{display:flex;align-items:center;gap:4px;padding:3px 5px;border-right:1px solid #d3d6da;min-width:max-content}
+.group:last-child{border-right:0}.group::after{display:none!important;content:none!important}
+.smallcol{display:flex;flex-direction:column;gap:2px;min-width:0}
+.smallbtn,.toolbtn,.xformbtn,.viewbtn{height:24px;border:1px solid transparent;background:transparent;border-radius:3px;padding:2px 5px;white-space:nowrap}
+.smallbtn:hover,.toolbtn:hover,.xformbtn:hover,.shape:hover,.bsbtn:hover,.gp-ctrl button:hover,.viewbtn:hover{background:#e5eef9;border-color:#9fc3ee}
+.toolbtn.active,.shape.active,.bsbtn.active,.gp-ctrl button.active,#selectBtn.active{background:#cfe4fb;border-color:#6fa6de}
+.iconbtn{width:30px;height:30px;padding:4px;display:inline-flex;align-items:center;justify-content:center}.iconbtn svg,.toolbtn svg,.viewbtn svg,#selectBtn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.iconrow{display:grid;grid-template-columns:repeat(3,30px);gap:2px}
+.toolgrid{display:grid;grid-template-columns:repeat(3,32px);grid-auto-rows:32px;gap:2px}.toolbtn{width:32px;height:32px;padding:5px;display:flex;align-items:center;justify-content:center}.toolbtn svg{width:18px;height:18px}
+.grp-glyph{align-items:flex-start}.glyphstack{display:flex;flex-direction:column;gap:2px;width:250px}
+.gp-top{display:flex;gap:3px;align-items:stretch}.gp-slots{display:flex;flex-direction:column;gap:2px}.gp-slot{width:27px;height:23px;border:1px solid #92979d;background:#fff;display:grid;grid-template-columns:8px 1fr;align-items:center;padding:1px}
+.gp-slot-label{font-size:8px;color:#6c7177;line-height:1}.gp-slot-char{font:700 13px/1 "Cascadia Mono",Consolas,monospace;text-align:center;overflow:hidden}
+.gp-grid{display:grid;grid-template-columns:repeat(9,23px);grid-auto-rows:23px;gap:1px;max-height:47px;overflow-y:auto;overflow-x:hidden}
+.gp-btn{width:23px;height:23px;border:1px solid #b9bdc2;background:#fff;padding:0;font:700 13px/1 "Cascadia Mono",Consolas,monospace;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative}
+.gp-btn:hover{outline:1px solid #70a7df;outline-offset:-1px}.gp-btn.prime{box-shadow:inset 0 0 0 2px #2b78d4}.gp-btn.sec{outline:1px dashed #bb6f25;outline-offset:-2px}.gp-btn.editing{cursor:text}.gp-btn.gp-add{font:700 16px/1 var(--ui-font);background:#eef4fa}.gp-btn.gp-add::after{content:"add";position:absolute;right:1px;bottom:0;font:6px/1 var(--ui-font);color:#65717e}
+.gp-ctrl{display:flex;gap:2px;align-items:center;height:20px}.gp-ctrl button{height:20px;border:1px solid #b9bdc2;background:#f7f7f8;border-radius:2px;padding:1px 6px;font-size:9px}.gp-ctrl .grow{flex:1}.palette-bgctl{display:flex;align-items:center;gap:3px;font-size:9px;white-space:nowrap}.palette-bgctl input{width:25px;height:19px;padding:1px;border:1px solid #aaa;background:#fff}.gp-edit-hint{font-size:9px;color:#7a4c16;white-space:nowrap}
+.brushrow{display:flex;align-items:center;gap:4px;height:25px;white-space:nowrap}.brushrow>label{color:#555}.brushrow input{width:48px;height:22px;padding:1px 4px}.brushshape{display:flex;align-items:center;gap:1px;margin-left:2px}.brushshape-label{font-size:9px;color:#666;margin-right:1px}
+.bsbtn{width:24px;height:22px;border:1px solid #b9bdc2;background:#fff;border-radius:2px;padding:0;font:13px/1 "Cascadia Mono",Consolas,monospace}.bsbtn.ratio{display:grid;place-items:center}.ratio-shape{display:block;background:currentColor;border-radius:1px}.ratio-shape.vertical.short{width:4px;height:12px}.ratio-shape.horizontal.short{width:12px;height:4px}.ratio-shape.vertical.long{width:3px;height:17px}.ratio-shape.horizontal.long{width:17px;height:3px}
+.grp-shapes{align-items:flex-start}.shapegrid{display:grid;grid-template-columns:repeat(6,27px);grid-auto-rows:27px;gap:1px;width:167px}.shape{width:27px;height:27px;border:1px solid transparent;background:#fff;padding:0;font:13px/1 "Cascadia Mono",Consolas,monospace}
+.options{display:grid;grid-template-columns:38px 76px;gap:2px 3px;align-content:center;font-size:10px}.options select{height:22px;font-size:10px;min-width:0}.options label{color:#555;align-self:center}
+#selectBtn{width:48px;height:66px;border:1px solid transparent;background:transparent;border-radius:3px;padding:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10px}.grp-selection>.smallcol{width:164px!important}#selectMode{width:164px;height:22px}.sel-grid{display:grid;grid-template-columns:repeat(4,39px);gap:2px}.sel-grid .smallbtn{width:39px;padding:2px;font-size:9px}.sel-chk{display:flex;align-items:center;gap:3px;font-size:9px;height:17px;white-space:nowrap}
+.transformgrid{display:grid;grid-template-columns:repeat(3,34px);grid-auto-rows:27px;gap:2px}.xformbtn{width:34px;height:27px;padding:1px 2px;font:10px/1 "Cascadia Mono",Consolas,monospace}.xformbtn:nth-child(4),.xformbtn:nth-child(5),.xformbtn.rotbtn{font-size:16px}
+.grp-view{align-items:flex-start}.viewcompact{display:grid;grid-template-columns:auto auto;grid-template-rows:auto auto;gap:4px 7px;align-items:center}.viewbuttons{display:flex;gap:2px;grid-column:1/-1}.viewbtn{width:30px;height:28px;padding:3px;display:flex;align-items:center;justify-content:center;font-size:10px}.viewbtn.textwide{width:38px;font:700 9px/1 "Cascadia Mono",Consolas,monospace}.viewopts{display:grid;grid-template-columns:repeat(2,max-content);gap:2px 7px;align-items:center;font-size:9px}.viewopts label{display:flex;align-items:center;gap:2px;white-space:nowrap}.squarebtn{height:22px;border:1px solid #b9bdc2;background:#fff;border-radius:2px;padding:1px 6px;font-size:9px}.squarebtn[aria-pressed="true"]{background:#cfe4fb;border-color:#6fa6de;font-weight:600}.bgctl{display:flex;align-items:center;gap:3px;white-space:nowrap;font-size:9px}.bgctl input[type=color]{width:27px;height:24px;padding:1px;border:1px solid #aaa;background:#fff}
+.workspace{grid-row:3;min-width:0;min-height:0;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);background:#b8bec5;overflow:hidden;position:relative}
+.rulerCorner{width:30px;height:22px;background:#eee;border-right:1px solid #aaa;border-bottom:1px solid #aaa}.hruler{height:22px;background:#eee;border-bottom:1px solid #aaa;overflow:hidden;position:relative;font:9px/22px Consolas,monospace;color:#555;white-space:nowrap}.vruler{width:30px;background:#eee;border-right:1px solid #aaa;overflow:hidden;position:relative;font:9px Consolas,monospace;color:#555}
+.workspace.no-rulers{grid-template-columns:0 minmax(0,1fr);grid-template-rows:0 minmax(0,1fr)}.workspace.no-rulers .rulerCorner,.workspace.no-rulers .hruler,.workspace.no-rulers .vruler{display:none}
+.scroller{overflow:auto;position:relative;padding:14px;grid-column:2;grid-row:2}.canvasWrap{position:relative;width:max-content;height:max-content;background:#fff;box-shadow:0 0 0 1px #777,2px 2px 5px #0004;transform-origin:top left}
+#canvasGrid{display:grid;gap:0;background:#000;font-family:"Cascadia Mono","Cascadia Code",Consolas,"DejaVu Sans Mono",monospace;font-size:var(--cell-fs);line-height:var(--cell-lh);font-variant-ligatures:none;font-feature-settings:"liga" 0,"calt" 0;user-select:none;touch-action:none}
+#canvasGrid.squarecells{grid-template-columns:repeat(80,1em)}#canvasGrid.squarecells .cell{width:1em;height:1em}.cell{width:1ch;height:1em;overflow:hidden;text-align:center;white-space:pre;display:block;position:relative}.gridlines .cell{outline:1px solid rgba(125,160,210,.24);outline-offset:-1px}.cell.selected{box-shadow:inset 0 0 0 1px #00a8ff;background-image:linear-gradient(45deg,#00a8ff22 25%,transparent 25%,transparent 50%,#00a8ff22 50%,#00a8ff22 75%,transparent 75%);background-size:4px 4px}.cell.preview{box-shadow:inset 0 0 0 1px #f0f,inset 0 0 0 2px #fff8}.cell.cursorcell{outline:1px dotted #fff;outline-offset:-1px}.cell.hovered{outline:1px solid #ffcc00!important;outline-offset:-1px;z-index:1}
+.statusbar{grid-row:4;height:24px;background:#f6f7f8;border-top:1px solid #b8bcc1;display:flex;align-items:center;gap:12px;padding:0 6px;font-size:10px;user-select:none;min-width:0}.statusbar.hidden{display:none}.statusbar .grow{flex:1;min-width:20px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.zoomCtl{display:flex;align-items:center;gap:4px}.zoomCtl button{width:21px;height:19px;padding:0;border:1px solid #bbb;background:#fff;border-radius:2px}.zoomCtl input{width:110px}
+.dropdown{position:fixed;z-index:50;display:none;background:#fff;border:1px solid #999;box-shadow:2px 4px 15px #0004;padding:3px;min-width:220px}.dropdown.open{display:block}.dropdown button{display:block;width:100%;text-align:left;border:0;background:#fff;padding:6px 9px}.dropdown button:hover{background:#dceeff}.dropdown hr{border:0;border-top:1px solid #ddd;margin:3px}
+dialog{border:1px solid #888;border-radius:2px;box-shadow:0 6px 30px #0006;padding:0;max-width:min(92vw,560px);font:11px/1.2 var(--ui-font)}dialog::backdrop{background:#0004}.dlgTitle{background:#f4f4f4;padding:8px 11px;border-bottom:1px solid #ccc;font-weight:600}.dlgBody{padding:12px;background:#fff}.dlgGrid{display:grid;grid-template-columns:145px 1fr;gap:8px;align-items:center}.dlgActions{padding:8px 12px;border-top:1px solid #ddd;background:#f7f7f7;display:flex;justify-content:flex-end;gap:6px}.dlgActions button{min-width:72px;padding:4px 9px}.textArea{width:100%;height:100px;font-family:Consolas,monospace}.kbd{font:9px Consolas,monospace;background:#eee;border:1px solid #ccc;border-bottom-width:2px;padding:1px 3px;border-radius:3px}.helpcols{columns:2;column-gap:24px;font-size:11px}.helpcols p{break-inside:avoid;margin:0 0 8px}
+.paletteEditRow{display:grid;grid-template-columns:70px 1fr;gap:8px;align-items:center}.paletteEditRow input[type=color]{width:100%;height:30px}
+.gcm-dialog{width:min(96vw,820px);max-width:820px;height:min(88vh,760px);max-height:88vh;overflow:hidden}.gcm-dialog[open]{display:grid;grid-template-rows:auto minmax(0,1fr) auto}.gcm-titlebar{position:relative;display:flex;align-items:center;gap:5px;background:#f4f4f4;padding:4px 5px;border-bottom:1px solid #ccc;font-weight:600}.gcm-titletext{margin-right:auto;padding-left:5px}.gcm-menubtn,.gcm-closex{height:24px;border:1px solid transparent;background:transparent;border-radius:3px;padding:2px 7px}.gcm-menubtn:hover,.gcm-closex:hover{background:#e1e8f2;border-color:#aabbd0}.gcm-closex{font-size:16px;line-height:16px;min-width:28px}.gcm-menu{position:fixed;z-index:400;display:none;background:#fff;border:1px solid #888;box-shadow:2px 4px 14px #0004;padding:3px;min-width:190px}.gcm-menu.open{display:block}.gcm-menu button{display:block;width:100%;border:0;background:#fff;text-align:left;padding:6px 9px}.gcm-menu button:hover{background:#dceeff}.gcm-dialog .dlgBody{min-height:0;display:flex;flex-direction:column;overflow:hidden}.gcm-toolbar{display:grid;grid-template-columns:minmax(180px,1fr) 150px;gap:7px;margin-bottom:8px}.gcm-toolbar input,.gcm-toolbar select{height:28px}.gcm-list{min-height:0;flex:1 1 auto;overflow:auto;border:1px solid var(--line);background:#fff}.gcm-head,.gcm-row{display:grid;grid-template-columns:54px 48px 8ch 56px minmax(110px,1fr) 96px;gap:6px;align-items:center;padding:4px 6px}.gcm-head{position:sticky;top:0;z-index:1;background:#eef0f3;border-bottom:1px solid var(--line);font-weight:600}.gcm-row{min-height:36px;border-bottom:1px solid var(--line2)}.gcm-row:last-child{border-bottom:0}.gcm-glyph{width:4ch;text-align:center;font:700 15px/1.2 "Cascadia Mono",Consolas,monospace}.gcm-colour{width:42px;height:28px;padding:1px}.gcm-hex{width:8ch;font-family:Consolas,monospace}.gcm-represents{width:100%;min-width:80px}.gcm-glyph.invalid,.gcm-hex.invalid{border-color:#b00020;background:#fff0f2}.gcm-actions{display:flex;gap:3px}.gcm-actions button{padding:3px 5px}.gcm-empty{padding:18px;text-align:center;color:var(--muted)}.gcm-status{margin-top:6px;color:var(--muted);min-height:14px}.gcm-spacer{flex:1}.ui-classic .gcm-list{border:2px solid;border-color:#404040 #fff #fff #404040}.ui-classic .gcm-titlebar,.ui-classic .gcm-head{background:#c0c0c0}.ui-classic .gcm-titlebar{margin:2px;background:#000080;color:#fff;border:0}.ui-classic .gcm-row{border-bottom-color:#808080}.ui-classic .gcm-actions button,.ui-classic .gcm-menubtn,.ui-classic .gcm-closex{background:#c0c0c0;color:#000;border:2px solid;border-color:#fff #404040 #404040 #fff;border-radius:0}@media(max-width:700px){.gcm-dialog{width:98vw;height:92vh;max-height:92vh}.gcm-head,.gcm-row{grid-template-columns:45px 40px 8ch 38px minmax(80px,1fr) 82px;gap:3px;padding:4px 3px}.gcm-toolbar{grid-template-columns:1fr}.gcm-actions button{padding:3px}.gcm-dialog .dlgActions{flex-wrap:wrap}}
+.cpick{position:fixed;z-index:200;background:#fff;border:1px solid #888;box-shadow:0 6px 24px #0006;padding:8px;width:216px}.cpick-head{display:flex;gap:6px;align-items:center;margin-bottom:6px}.cpick-swatch{width:32px;height:20px;border:1px solid #999;border-radius:2px;flex:none}.cpick-hex{flex:1;font:11px Consolas,monospace;padding:2px 4px;border:1px solid #bbb}.cpick label{display:flex;align-items:center;gap:6px;font-size:10px;color:#555;margin:2px 0}.cpick label span{width:64px}.cpick label input[type=range]{flex:1;height:14px}.cpick-presets{display:grid;grid-template-columns:repeat(6,26px);gap:3px;margin-top:6px}.cpick-preset{width:26px;height:18px;border:1px solid #999;border-radius:2px;cursor:pointer;padding:0}
+/* Win98-style side UI: same controls, different layout only. */
+/* Modern ribbon: use vertical space deliberately so controls group compactly instead of forming one long strip. */
+#app:not(.classic){grid-template-rows:30px 138px minmax(0,1fr) 24px}
+#app:not(.classic) .ribbon{height:138px;padding:5px 4px;align-items:stretch;overflow-x:auto;overflow-y:hidden}
+#app:not(.classic) .group{align-items:flex-start;justify-content:flex-start;gap:4px;padding:3px 6px}
+
+/* 2 x 3 tool bank: same targets, substantially less horizontal footprint. */
+#app:not(.classic) .grp-tools{align-items:flex-start}
+#app:not(.classic) .toolgrid{grid-template-columns:repeat(2,32px);grid-template-rows:repeat(3,32px);grid-auto-rows:32px;gap:3px}
+
+/* Palette gets two functional rows below the glyph tiles: edit controls, then brush configuration. */
+#app:not(.classic) .glyphstack{width:238px;gap:2px}
+#app:not(.classic) .gp-grid{grid-template-columns:repeat(9,22px);grid-auto-rows:22px;gap:1px;max-height:45px}
+#app:not(.classic) .gp-btn{width:22px;height:22px}
+#app:not(.classic) .gp-slot{width:27px;height:22px}
+#app:not(.classic) .gp-ctrl{height:20px}.palette-bgctl{margin-left:auto}
+#app:not(.classic) .brushrow{height:auto;display:grid;grid-template-columns:28px 52px 1fr;grid-template-rows:22px 22px;gap:2px 3px;align-items:center;white-space:nowrap}
+#app:not(.classic) .brushrow>label{grid-column:1}
+#app:not(.classic) .brushrow>input{grid-column:2;width:52px;height:22px}
+#app:not(.classic) .brushshape{grid-column:1/-1;display:grid;grid-template-columns:28px repeat(6,24px);gap:2px;margin:0;align-items:center}
+#app:not(.classic) .brushshape-label{margin:0}
+
+/* Shapes use a tall 3 x 4 bank, with stroke/fill controls beside it. */
+#app:not(.classic) .grp-shapes{align-items:flex-start}
+#app:not(.classic) .shapegrid{grid-template-columns:repeat(3,27px);grid-template-rows:repeat(4,27px);grid-auto-rows:27px;width:83px;gap:1px}
+#app:not(.classic) .options{grid-template-columns:37px 74px;gap:3px;align-content:start;padding-top:1px}
+#app:not(.classic) .options select{height:23px}
+
+/* Clipboard is a vertical command rail instead of consuming three columns. */
+#app:not(.classic) .grp-clipboard .iconrow{grid-template-columns:30px;grid-template-rows:repeat(3,30px);gap:3px}
+
+/* Selection becomes one compact vertical block. */
+#app:not(.classic) .grp-selection{display:grid;grid-template-columns:142px;grid-template-rows:27px 22px 48px 17px;gap:2px;align-content:start}
+#app:not(.classic) #selectBtn{grid-row:1;width:142px;height:27px;flex-direction:row;gap:5px;padding:2px 5px}
+#app:not(.classic) .grp-selection>.smallcol{display:contents;width:auto!important}
+#app:not(.classic) #selectMode{grid-row:2;width:142px;height:22px}
+#app:not(.classic) .sel-grid{grid-row:3;grid-template-columns:repeat(2,70px);grid-template-rows:repeat(2,23px);gap:2px}
+#app:not(.classic) .sel-grid .smallbtn{width:70px;height:23px;font-size:9px}
+#app:not(.classic) .sel-chk{grid-row:4;height:17px}
+
+/* Transform now uses three rows rather than a wide three-column shelf. */
+#app:not(.classic) .transformgrid{grid-template-columns:repeat(2,41px);grid-template-rows:repeat(3,27px);grid-auto-rows:27px;gap:3px}
+#app:not(.classic) .xformbtn{width:41px;height:27px}
+
+/* View uses the increased ribbon height: 2 x 2 zoom controls, 2 x 2 toggles, field colour below. */
+#app:not(.classic) .viewcompact{width:104px;display:grid;grid-template-columns:1fr;grid-template-rows:auto auto auto;gap:5px;align-items:start}
+#app:not(.classic) .viewbuttons{grid-column:1;display:grid;grid-template-columns:repeat(2,48px);grid-template-rows:repeat(2,28px);gap:3px}
+#app:not(.classic) .viewbtn,#app:not(.classic) .viewbtn.textwide{width:48px;height:28px}
+#app:not(.classic) .viewopts{grid-template-columns:repeat(2,max-content);gap:3px 7px;font-size:9px}.squarebtn{grid-column:1/-1;width:100%}
+#app:not(.classic) .bgctl{height:24px}
+#app.classic{grid-template-columns:286px minmax(0,1fr);grid-template-rows:30px minmax(0,1fr) 24px;background:#c0c0c0}
+#app.classic .titlebar{grid-row:1;grid-column:1/-1;height:30px;margin:0;padding:3px 4px;background:linear-gradient(90deg,#000080,#1084d0);border:2px solid;border-color:#fff #404040 #404040 #fff;color:#fff;font-family:Tahoma,"MS Sans Serif",Arial,sans-serif;gap:4px}
+#app.classic .appmark{color:#fff;width:18px}#app.classic .title{font-weight:700;font-size:11px;text-shadow:1px 1px #000}
+#app.classic .quick button,#app.classic .modeToggle,#app.classic .titlebar .filebtn{height:20px;min-width:24px;background:#c0c0c0;color:#000;border:2px solid;border-color:#fff #404040 #404040 #fff;border-radius:0;padding:0 5px;box-shadow:none;margin:0}
+#app.classic .titlebar .filebtn{min-width:40px}#app.classic .quick button:active,#app.classic .modeToggle:active,#app.classic .titlebar .filebtn:active{border-color:#404040 #fff #fff #404040;padding:1px 4px 0 6px}
+#app.classic .ribbonwrap{grid-row:2;grid-column:1;min-height:0;background:#c0c0c0;border-right:2px solid #808080;border-bottom:0;overflow:hidden}
+#app.classic .ribbon{height:auto;min-height:100%;width:100%;flex-direction:column;align-items:stretch;overflow:visible;padding:4px;gap:8px;background:#c0c0c0}
+#app.classic .group{width:100%;min-width:0;flex-wrap:wrap;align-items:center;gap:4px;padding:5px;background:#c0c0c0;border:2px solid;border-color:#fff #808080 #808080 #fff}
+#app.classic .smallbtn,#app.classic .toolbtn,#app.classic .xformbtn,#app.classic .bsbtn,#app.classic .gp-ctrl button,#app.classic .shape,#app.classic .viewbtn,#app.classic #selectBtn,#app.classic .zoomCtl button{background:#c0c0c0;border:2px solid;border-color:#fff #404040 #404040 #fff;border-radius:0;color:#000}
+#app.classic .smallbtn:active,#app.classic .toolbtn:active,#app.classic .xformbtn:active,#app.classic .bsbtn:active,#app.classic .gp-ctrl button:active,#app.classic .shape:active,#app.classic .viewbtn:active,#app.classic #selectBtn:active,#app.classic .toolbtn.active,#app.classic .shape.active,#app.classic .bsbtn.active,#app.classic .gp-ctrl button.active,#app.classic #selectBtn.active{border-color:#404040 #fff #fff #404040;background:#b8b8b8;box-shadow:none;outline:0}
+#app.classic .grp-tools{order:1}#app.classic .grp-view{order:2}#app.classic .grp-glyph{order:3}#app.classic .grp-shapes{order:4}#app.classic .grp-clipboard{order:5}#app.classic .grp-selection{order:6}#app.classic .grp-transform{order:7}
+#app.classic .grp-tools .toolgrid{width:100%;grid-template-columns:repeat(3,1fr);grid-auto-rows:52px;gap:4px}#app.classic .grp-tools .toolbtn{width:auto;height:52px;padding:8px}#app.classic .grp-tools .toolbtn svg{width:26px;height:26px}
+#app.classic .glyphstack{width:100%}#app.classic .gp-top{width:100%}#app.classic .gp-grid{flex:none;grid-template-columns:repeat(6,34px);max-height:none;grid-auto-rows:34px;gap:2px}#app.classic .gp-btn{width:34px;height:34px;background:#fff;border:2px solid;border-color:#fff #404040 #404040 #fff;border-radius:0;font-size:16px}#app.classic .gp-btn.prime{box-shadow:inset 0 0 0 2px #000080}#app.classic .gp-btn.sec{outline:1px dashed #800000;outline-offset:-3px}#app.classic .gp-slot{width:31px;height:34px;border:2px solid;border-color:#404040 #fff #fff #404040;background:#fff}#app.classic .gp-ctrl{width:100%;height:26px}#app.classic .gp-ctrl button{height:25px;font-size:10px}#app.classic .gp-ctrl .grow{display:block}#app.classic .gp-edit-hint{font-size:9px}
+#app.classic .brushrow{width:100%;height:auto;display:grid;grid-template-columns:42px 1fr 48px;gap:3px;align-items:center}#app.classic .brushrow input{height:27px;width:100%}#app.classic .brushshape{grid-column:1/-1;display:grid;grid-template-columns:28px repeat(6,1fr);gap:2px;margin:0}#app.classic .brushshape-label{font-size:10px;align-self:center}#app.classic .bsbtn{width:auto;height:30px}
+#app.classic .grp-shapes{align-items:flex-start}#app.classic .shapegrid{width:214px;grid-template-columns:repeat(6,34px);grid-auto-rows:34px;gap:2px}#app.classic .shape{width:34px;height:34px;font-size:16px}#app.classic .options{width:100%;grid-template-columns:48px 1fr;gap:3px}#app.classic .options select{height:27px}
+#app.classic .grp-clipboard .iconrow{width:100%;grid-template-columns:repeat(3,1fr);gap:4px}#app.classic .grp-clipboard .iconbtn{width:auto;height:32px}
+#app.classic .grp-selection{align-items:stretch}#app.classic #selectBtn{width:100%;height:34px;flex-direction:row;gap:5px;font-size:11px}#app.classic .grp-selection>.smallcol{width:100%!important}#app.classic #selectMode{width:100%;height:27px}#app.classic .sel-grid{grid-template-columns:repeat(4,1fr);gap:3px}#app.classic .sel-grid .smallbtn{width:auto;height:28px;font-size:10px}#app.classic .sel-chk{height:20px;font-size:10px}
+#app.classic .transformgrid{width:100%;grid-template-columns:repeat(3,1fr);grid-auto-rows:30px;gap:3px}#app.classic .xformbtn{width:auto;height:30px;font-size:10px}#app.classic .xformbtn:nth-child(4),#app.classic .xformbtn:nth-child(5){font-size:15px}
+#app.classic .viewcompact{width:100%;grid-template-columns:1fr;grid-template-rows:auto auto auto;gap:5px}#app.classic .viewbuttons{grid-column:1;display:grid;grid-template-columns:repeat(4,1fr);gap:3px}#app.classic .viewbtn{width:auto;height:32px}#app.classic .viewopts{grid-template-columns:1fr 1fr;font-size:10px;gap:4px 8px}#app.classic .bgctl{font-size:10px}#app.classic .bgctl input[type=color]{width:42px;height:28px}
+.ui-classic select,.ui-classic input[type=number],.ui-classic input[type=text],.ui-classic textarea{border:2px solid;border-color:#404040 #fff #fff #404040;border-radius:0;background:#fff;color:#000}.ui-classic input[type=color]{border:2px solid;border-color:#404040 #fff #fff #404040;border-radius:0;background:#c0c0c0}
+#app.classic .workspace{grid-row:2;grid-column:2;background:#808080;border-top:1px solid #404040}#app.classic .scroller{padding:10px}#app.classic .statusbar{grid-row:3;grid-column:1/-1;height:24px;background:#c0c0c0;border-top:2px solid #fff;gap:6px;padding:2px 4px;font-family:Tahoma,"MS Sans Serif",Arial,sans-serif}#app.classic .statusbar>span{border:1px solid;border-color:#808080 #fff #fff #808080;padding:2px 4px;height:18px;display:flex;align-items:center}#app.classic .statusbar .grow{display:flex}
+.ui-classic .dropdown,.ui-classic dialog,.ui-classic .cpick{font-family:Tahoma,"MS Sans Serif",Arial,sans-serif;background:#c0c0c0;border:2px solid;border-color:#fff #404040 #404040 #fff;border-radius:0;box-shadow:2px 2px 0 #000}.ui-classic .dropdown button,.ui-classic .dlgBody,.ui-classic .dlgActions,.ui-classic .dlgTitle{background:#c0c0c0}.ui-classic .dropdown button:hover{background:#000080;color:#fff}.ui-classic .dlgTitle{background:#000080;color:#fff;border-bottom:0;margin:2px;padding:4px 6px;font-weight:700}.ui-classic .dlgActions{border-top:1px solid #808080}.ui-classic .dlgActions button{background:#c0c0c0;border:2px solid;border-color:#fff #404040 #404040 #fff;border-radius:0}.ui-classic .kbd{border-radius:0;background:#fff}
+/* Classic side-panel refinement v4: 214 px control lattice inside a 236 px shell. */
+#app.classic{grid-template-columns:236px minmax(0,1fr)}
+#app.classic .ribbon{padding:4px;gap:8px}
+#app.classic .group{width:100%;min-width:0;padding:3px 5px;gap:2px;align-items:flex-start;align-content:flex-start}
+#app.classic .grp-tools{order:1}
+#app.classic .grp-glyph{order:2}
+#app.classic .grp-shapes{order:3}
+#app.classic .grp-selection{order:4}
+#app.classic .grp-clipboard{order:5}
+#app.classic .grp-transform{order:6}
+#app.classic .grp-view{order:7}
+
+/* Six drawing tools: each spans two cells of the 6-column, 34 px shape lattice. */
+#app.classic .grp-tools .toolgrid{width:214px;grid-template-columns:repeat(3,70px);grid-template-rows:repeat(2,36px);grid-auto-rows:36px;gap:2px}
+#app.classic .grp-tools .toolbtn{width:70px;height:36px;padding:6px}
+#app.classic .grp-tools .toolbtn svg{width:22px;height:22px}
+
+/* Palette: primary/secondary and edit controls share one compact row; palette remains 34 px per cell. */
+#app.classic .glyphstack{width:214px;display:grid;grid-template-columns:70px 142px;grid-template-areas:"slots slots" "palette palette" "controls controls" "brush brush";gap:2px}
+#app.classic .gp-top{display:contents}
+#app.classic .gp-slots{grid-area:slots;display:flex;flex-direction:row;gap:2px;width:70px}
+#app.classic .gp-slot{width:34px;height:30px;grid-template-columns:8px 1fr;padding:1px}
+#app.classic .gp-slot-char{font-size:15px}
+#app.classic .gp-grid{grid-area:palette;width:214px;grid-template-columns:repeat(6,34px);grid-auto-rows:34px;gap:2px;max-height:none;overflow:visible}
+#app.classic .gp-btn{width:34px;height:34px;font-size:16px}
+#app.classic .gp-ctrl{grid-area:controls;width:214px;height:30px;gap:2px;display:flex;align-items:center}
+#app.classic .gp-ctrl button{height:30px;padding:1px 7px;font-size:10px}
+#app.classic #gpEditBtn,#app.classic #gpResetBtn{min-width:38px}.ui-classic .palette-bgctl{font-size:0;gap:0}.ui-classic .palette-bgctl input{width:30px;height:30px;border:2px solid;border-color:#404040 #fff #fff #404040;background:#c0c0c0}
+#app.classic #gpBgBtn{width:30px;min-width:30px;padding:0;font-size:14px}
+#app.classic .gp-edit-hint{display:none!important}
+#app.classic .brushrow{grid-area:brush;width:214px;height:auto;display:grid;grid-template-columns:34px 58px 1fr;grid-template-rows:24px 26px;gap:2px;align-items:center}
+#app.classic .brushrow>label{grid-column:1;grid-row:1;font-size:10px}
+#app.classic .brushrow>input{grid-column:2;grid-row:1;width:58px;height:24px}
+#app.classic .brushshape{grid-column:1/-1;grid-row:2;display:grid;grid-template-columns:repeat(6,34px);gap:2px;margin:0;width:214px}
+#app.classic .brushshape-label{display:none}
+#app.classic .bsbtn{width:34px;height:26px;font-size:13px}
+#app.classic .bsbtn.ratio{font-size:8px}
+
+/* Shapes are the dimensional reference: 6 x 34 px, two rows. Controls align to the same 3-column rhythm. */
+#app.classic .grp-shapes{display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+#app.classic .shapegrid{width:214px;grid-template-columns:repeat(6,34px);grid-template-rows:repeat(2,34px);grid-auto-rows:34px;gap:2px}
+#app.classic .shape{width:34px;height:34px;font-size:16px}
+#app.classic .options{width:214px;display:grid;grid-template-columns:repeat(3,70px);grid-template-rows:12px 24px;gap:2px;font-size:9px;align-content:start}
+#app.classic .options>label{grid-row:1;text-align:left;align-self:end;font-size:9px}
+#app.classic .options>select{grid-row:2;width:70px;height:24px;font-size:10px}
+#app.classic .options>label:nth-child(1),#app.classic .options>select:nth-child(2){grid-column:1}
+#app.classic .options>label:nth-child(3),#app.classic .options>select:nth-child(4){grid-column:2}
+#app.classic .options>label:nth-child(5),#app.classic .options>select:nth-child(6){grid-column:3}
+
+/* Selection: tool/mode share a row; actions use four equal cells below. */
+#app.classic .grp-selection{display:grid;grid-template-columns:70px 142px;grid-template-rows:30px 24px 16px;gap:2px;align-items:stretch}
+#app.classic #selectBtn{grid-column:1;grid-row:1;width:70px;height:30px;flex-direction:row;gap:4px;padding:2px 5px;font-size:10px}
+#app.classic #selectBtn svg{width:15px;height:15px}
+#app.classic .grp-selection>.smallcol{display:contents;width:auto!important}
+#app.classic #selectMode{grid-column:2;grid-row:1;width:142px;height:30px;font-size:10px}
+#app.classic .sel-grid{grid-column:1/-1;grid-row:2;width:214px;grid-template-columns:repeat(4,52px);grid-template-rows:24px;gap:2px}
+#app.classic .sel-grid .smallbtn{width:52px;height:24px;padding:1px 2px;font-size:9px}
+#app.classic .sel-chk{grid-column:1/-1;grid-row:3;height:16px;font-size:9px;margin:0}
+
+/* Clipboard and transforms follow the same 3-column, 70 px button rhythm as Tools. */
+#app.classic .grp-clipboard .iconrow{width:214px;grid-template-columns:repeat(3,70px);grid-template-rows:28px;gap:2px}
+#app.classic .grp-clipboard .iconbtn{width:70px;height:28px;padding:4px}
+#app.classic .grp-transform .transformgrid{width:214px;grid-template-columns:repeat(3,70px);grid-template-rows:repeat(2,26px);grid-auto-rows:26px;gap:2px}
+#app.classic .grp-transform .xformbtn{width:70px;height:26px;padding:1px 2px;font-size:10px}
+#app.classic .grp-transform .xformbtn:nth-child(4),#app.classic .grp-transform .xformbtn:nth-child(5){font-size:14px}
+
+/* View uses four equal buttons across the same 214 px lattice, then a terse status/options row. */
+#app.classic .viewcompact{width:214px;display:grid;grid-template-columns:1fr;grid-template-rows:auto auto auto auto;gap:2px;align-items:center}
+#app.classic .viewbuttons{grid-column:1;grid-row:1;display:grid;grid-template-columns:repeat(4,52px);grid-template-rows:26px;gap:2px;width:214px}
+#app.classic .viewbtn,#app.classic .viewbtn.textwide{width:52px;height:26px;padding:2px}
+#app.classic .viewopts{grid-column:1;grid-row:2;width:214px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:9px}#app.classic .viewopts label{width:64px}.ui-classic .squarebtn{height:22px;background:#c0c0c0;border:2px solid;border-color:#fff #404040 #404040 #fff;border-radius:0}
+#app.classic .viewopts label{gap:1px;justify-content:flex-start}
+#app.classic .viewopts input{margin:0 1px 0 0}
+#app.classic .bgctl{grid-column:1;grid-row:3;height:24px;font-size:9px;gap:4px}
+#app.classic .bgctl input[type=color]{width:44px;height:24px}
+
+@media(max-width:1100px){#app:not(.classic){grid-template-rows:30px 138px minmax(0,1fr) 24px}.ribbon{overflow-x:auto}}
+#app.classic:has(.ribbonwrap.classic-overflow){grid-template-columns:254px minmax(0,1fr)}#app.classic .ribbonwrap.classic-overflow{overflow-y:scroll;overflow-x:hidden;scrollbar-gutter:stable}#app.classic .ribbonwrap.classic-overflow .ribbon{width:236px;min-height:max-content;padding-bottom:12px}#app.classic .ribbonwrap.classic-overflow .group{width:228px}#app.classic .ribbonwrap:not(.classic-overflow){overflow:hidden}#app.classic .ribbonwrap:not(.classic-overflow) .ribbon{width:100%}
+
+@media print{html,body{height:auto;overflow:visible}#app,#app.classic,.workspace{height:auto;overflow:visible}.titlebar,.ribbonwrap,.statusbar,.rulerCorner,.hruler,.vruler{display:none!important}#app,#app.classic{display:block;background:#fff}.workspace,#app.classic .workspace{display:block;background:#fff}.scroller{padding:0;overflow:visible}.canvasWrap{box-shadow:none;transform:none!important}}
+
+/* Canvas viewport and keyboard / touch workflow */
+#canvasGrid,#canvasOverlay{display:block;position:absolute;user-select:none;touch-action:none;background:transparent}
+#canvasOverlay{pointer-events:none}
+.canvasWrap{background:transparent;transform:none;box-shadow:none}
+.canvasWrap:focus-visible{outline:3px solid #086dcc;outline-offset:2px}
+:focus-visible{outline:2px solid #086dcc;outline-offset:2px}
+.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip-path:inset(50%);white-space:nowrap;border:0!important}
+#jobPanel{position:fixed;z-index:100;bottom:42px;left:50%;transform:translateX(-50%);background:white;border:2px solid #086dcc;padding:12px;box-shadow:0 2px 10px #0006;display:flex;gap:20px;align-items:center}
+#jobPanel[hidden]{display:none}
+#recoveryStatus{max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#fileMenu{max-height:85vh;overflow-y:auto;max-width:95vw}
+.recoveryItem{border-bottom:1px solid #ccc;padding:8px 0}.recoveryItem button{margin-right:10px;padding:6px}
+#recoveryDialog{width:min(94vw,700px);max-height:85vh;overflow:auto}
+#textViewDialog{width:min(94vw,900px);max-width:900px}#readableText{width:100%;height:50vh;font:14px/1.4 'DejaVu Sans Mono',monospace;white-space:pre;overflow:auto}
+#cellStyleDialog select{max-width:100%}#cellStyleDialog input[type=color]{width:50px;height:34px;margin-left:4px;vertical-align:middle}
+#secondaryToggle[aria-pressed=true],#panToggle[aria-pressed=true]{background:#cfe4fb;border-color:#6fa6de}
+#app.classic .grp-workflow{display:flex;flex-wrap:wrap;gap:5px;width:100%;min-width:0}#app.classic .grp-workflow .smallcol{min-width:0;max-width:100%}#app.classic #edgePolicy{max-width:150px}
+#printImage{display:none}
+@media (max-width:760px),(pointer:coarse){
+  body,button,input,select,textarea{font-size:14px}
+  #app:is(.classic,:not(.classic)),#app:is(.classic,:not(.classic)).classic{grid-template-columns:minmax(0,1fr);grid-template-rows:48px min(252px,36vh) minmax(0,1fr) 60px}
+  #app:is(.classic,:not(.classic)) .titlebar,#app:is(.classic,:not(.classic)).classic .titlebar{grid-row:1;grid-column:1;min-height:48px}
+  #app:is(.classic,:not(.classic)) .ribbonwrap,#app:is(.classic,:not(.classic)).classic .ribbonwrap{grid-row:2;grid-column:1;width:100%;overflow:auto;scrollbar-gutter:auto;padding:0}
+  #app:is(.classic,:not(.classic)) .ribbon,#app:is(.classic,:not(.classic)).classic .ribbon{display:flex;flex-direction:row;align-items:flex-start;width:max-content;height:252px;padding:4px;overflow:visible;gap:8px}
+  #app:is(.classic,:not(.classic)) .group,#app:is(.classic,:not(.classic)).classic .group{width:auto;min-width:max-content;height:240px;display:flex;flex-direction:row;padding:3px;flex-wrap:nowrap;border-right:1px solid #aaa}
+  #app:is(.classic,:not(.classic)) .workspace,#app:is(.classic,:not(.classic)).classic .workspace{grid-row:3;grid-column:1}
+  #app:is(.classic,:not(.classic)) .statusbar,#app:is(.classic,:not(.classic)).classic .statusbar{grid-row:4;grid-column:1;height:60px;gap:5px;padding:2px;font-size:11px;flex-wrap:wrap;align-content:center}
+  #app:is(.classic,:not(.classic)) .statusbar>span{height:auto;display:block;border:0;padding:0}
+  #app:is(.classic,:not(.classic)) .statusbar .grow{flex-basis:45%}#app:is(.classic,:not(.classic)) #selectStat,#app:is(.classic,:not(.classic)) #sizeStat{display:none}
+  #app:is(.classic,:not(.classic)) button,#app:is(.classic,:not(.classic)).classic button,dialog button,.dropdown button{min-width:44px;min-height:44px;height:auto;font-size:13px}
+  #app:is(.classic,:not(.classic)) .gp-grid{grid-template-columns:repeat(5,44px);grid-template-rows:none;grid-auto-rows:44px;max-height:90px}
+  #app:is(.classic,:not(.classic)) .gp-btn,#app:is(.classic,:not(.classic)) .gp-slot{width:44px;height:44px}#app:is(.classic,:not(.classic)) .glyphstack{width:340px}#app:is(.classic,:not(.classic)) .gp-ctrl{height:48px}
+  #app:is(.classic,:not(.classic)) .toolgrid{grid-template-columns:repeat(3,44px);grid-template-rows:none;grid-auto-rows:44px}#app:is(.classic,:not(.classic)) .iconrow,#app:is(.classic,:not(.classic)) .transformgrid{grid-template-columns:repeat(3,44px);grid-template-rows:none;grid-auto-rows:44px}
+  #app:is(.classic,:not(.classic)) .shapegrid{grid-template-columns:repeat(4,44px);grid-template-rows:none;grid-auto-rows:44px;width:180px}#app:is(.classic,:not(.classic)) .options{grid-template-columns:60px 100px}
+  #app:is(.classic,:not(.classic)) .options select,#app:is(.classic,:not(.classic)) input[type=number],#app:is(.classic,:not(.classic)) select{min-height:36px}
+  #app:is(.classic,:not(.classic)) .grp-selection>.smallcol{width:240px!important}#app:is(.classic,:not(.classic)) .sel-grid{grid-template-columns:repeat(4,56px)}#app:is(.classic,:not(.classic)) .sel-grid .smallbtn{width:56px}#app:is(.classic,:not(.classic)) #selectMode{width:240px}
+  #app:is(.classic,:not(.classic)) .viewopts{font-size:12px}#app:is(.classic,:not(.classic)) .gp-edit-hint{font-size:11px}#app:is(.classic,:not(.classic)) .gp-slot-label{font-size:11px}#app:is(.classic,:not(.classic)) .gp-slot-char{font-size:18px}
+  #app:is(.classic,:not(.classic)) .brushrow{height:88px;display:flex;flex-wrap:wrap;align-content:start;gap:4px}.brushshape{display:flex!important;flex-wrap:nowrap;gap:4px!important;margin:0!important}#app:is(.classic,:not(.classic)) .bgctl input{height:36px;width:44px}
+  .titlebar .title{font-size:11px}.modeToggle{min-width:60px!important}.titlebar .modeToggle #uiModeIcon{display:none}
+  .zoomCtl input{width:65px}.statusbar .zoomCtl button{min-width:36px!important;min-height:36px!important;padding:0}#recoveryStatus{max-width:120px}
+  dialog{font-size:14px;max-height:90vh;overflow:auto;max-width:96vw}.dlgGrid{grid-template-columns:1fr;gap:5px}.dlgActions{flex-wrap:wrap;padding:8px}.dlgBody{padding:10px}
+  .gcm-dialog{width:96vw!important;max-width:96vw!important;overflow:auto}.gcm-list{overflow:auto}
+  #app:is(.classic,:not(.classic)) #homeRibbon .grp-workflow{width:auto;min-width:max-content;flex-wrap:nowrap}
+  #app:is(.classic,:not(.classic)) #homeRibbon .grp-workflow .smallcol{max-width:none}#app:is(.classic,:not(.classic)) #edgePolicy{max-width:180px}
+
+  /* Reset desktop grid areas in both mobile layouts; the ribbon scrolls as a unit. */
+  #app #homeRibbon .group{display:flex;flex-direction:row;align-items:flex-start;min-width:max-content;width:auto;gap:6px;flex-wrap:nowrap}
+  #app #homeRibbon .toolgrid{width:auto;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,44px);grid-auto-rows:44px;gap:4px}
+  #app #homeRibbon .toolbtn{width:44px;height:44px;min-height:44px;padding:5px}
+  #app #homeRibbon .glyphstack{display:flex;flex-direction:column;width:340px;min-width:340px;height:auto;gap:4px}
+  #app #homeRibbon .gp-top{display:flex;flex-direction:row;align-items:start;width:340px;gap:4px}
+  #app #homeRibbon .gp-slots{display:flex;flex-direction:column;gap:2px}
+  #app #homeRibbon .gp-slot{width:44px;height:44px}
+  #app #homeRibbon .gp-grid{display:grid;width:224px;min-width:224px;grid-template-columns:repeat(5,44px);grid-template-rows:none;grid-auto-rows:44px;gap:1px;max-height:90px;overflow-y:auto;overflow-x:hidden}
+  #app #homeRibbon .gp-btn{width:44px;height:44px;padding:0;font-size:17px}
+  #app #homeRibbon .gp-ctrl{display:flex;align-items:center;width:340px;height:44px;gap:4px}
+  #app #homeRibbon .gp-ctrl button{height:44px;min-height:44px}
+  #app #homeRibbon .brushrow{display:flex;flex-wrap:wrap;align-content:start;width:340px;height:88px;gap:4px}
+  #app #homeRibbon .brushrow>label{display:block;min-height:36px;line-height:36px}
+  #app #homeRibbon .brushshape{display:flex;flex-wrap:nowrap;width:auto;height:44px;gap:4px;margin:0}
+  #app #homeRibbon .bsbtn{width:44px;height:44px;flex:none}
+  #app #homeRibbon .shapegrid{width:179px;grid-template-columns:repeat(4,44px);grid-template-rows:repeat(3,44px);grid-auto-rows:44px;gap:1px}
+  #app #homeRibbon .shape{width:44px;height:44px}
+  #app #homeRibbon .options{width:164px;grid-template-columns:60px 100px;grid-template-rows:none;grid-auto-rows:36px;gap:4px}
+  #app #homeRibbon .options label,#app #homeRibbon .options select{grid-column:auto;grid-row:auto;min-height:36px}
+  #app #homeRibbon .grp-clipboard .iconrow{width:auto;grid-template-columns:44px;grid-template-rows:repeat(3,44px);gap:4px}
+  #app #homeRibbon .grp-transform .transformgrid{width:140px;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,44px);grid-auto-rows:44px;gap:4px}
+  #app #homeRibbon .xformbtn{width:44px;height:44px}
+  #app #homeRibbon .grp-selection>.smallcol{display:flex;flex-direction:column;width:240px!important;gap:4px}
+  #app #homeRibbon #selectBtn{width:60px;height:88px}
+  #app #homeRibbon #selectMode{width:240px;height:44px}
+  #app #homeRibbon .sel-grid{display:grid;width:240px;grid-template-columns:repeat(4,56px);grid-template-rows:44px;gap:4px}
+  #app #homeRibbon .sel-grid button{width:56px;height:44px}
+  #app #homeRibbon .sel-chk{height:36px;font-size:12px}
+  #app #homeRibbon .viewcompact{display:flex;flex-direction:column;width:200px;gap:5px}
+  #app #homeRibbon .viewbuttons{display:grid;width:188px;grid-template-columns:repeat(4,44px);grid-template-rows:44px;gap:4px}
+  #app #homeRibbon .viewbtn{width:44px;height:44px}
+  #app #homeRibbon .viewopts{display:grid;grid-template-columns:1fr 1fr;font-size:12px;gap:6px}
+  #app #homeRibbon .grp-workflow .smallcol{display:flex;flex-direction:column;gap:4px}
+}
+
+@media (forced-colors:active){button[aria-pressed=true],.toolbtn.active{outline:3px solid Highlight}.canvasWrap:focus-visible{outline-color:Highlight}}
+@media print{#app,#app.classic,#jobPanel,.sr-only,dialog{display:none!important}#printImage{display:block;max-width:100%;height:auto;image-rendering:auto}body{height:auto;overflow:visible;background:white}}
+</style>
+<!-- Embedded font license:
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: DejaVu fonts
+Upstream-Author: Stepan Roh <src@users.sourceforge.net> (original author),
+                  see /usr/share/doc/fonts-dejavu-core/AUTHORS for full list
+Source: https://dejavu-fonts.github.io/
+
+Files: *
+Copyright: Copyright (c) 2003 by Bitstream, Inc. All Rights Reserved.
+ Bitstream Vera is a trademark of Bitstream, Inc.
+ DejaVu changes are in public domain.
+License: bitstream-vera
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of the fonts accompanying this license ("Fonts") and associated
+ documentation files (the "Font Software"), to reproduce and distribute the
+ Font Software, including without limitation the rights to use, copy, merge,
+ publish, distribute, and/or sell copies of the Font Software, and to permit
+ persons to whom the Font Software is furnished to do so, subject to the
+ following conditions:
+ .
+ The above copyright and trademark notices and this permission notice shall
+ be included in all copies of one or more of the Font Software typefaces.
+ .
+ The Font Software may be modified, altered, or added to, and in particular
+ the designs of glyphs or characters in the Fonts may be modified and
+ additional glyphs or characters may be added to the Fonts, only if the fonts
+ are renamed to names not containing either the words "Bitstream" or the word
+ "Vera".
+ .
+ This License becomes null and void to the extent applicable to Fonts or Font
+ Software that has been modified and is distributed under the "Bitstream
+ Vera" names.
+ .
+ The Font Software may be sold as part of a larger software package but no
+ copy of one or more of the Font Software typefaces may be sold by itself.
+ .
+ THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF COPYRIGHT, PATENT,
+ TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL BITSTREAM OR THE GNOME
+ FOUNDATION BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, INCLUDING
+ ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES,
+ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF
+ THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM OTHER DEALINGS IN THE
+ FONT SOFTWARE.
+ .
+ Except as contained in this notice, the names of Gnome, the Gnome
+ Foundation, and Bitstream Inc., shall not be used in advertising or
+ otherwise to promote the sale, use or other dealings in this Font Software
+ without prior written authorization from the Gnome Foundation or Bitstream
+ Inc., respectively. For further information, contact: fonts at gnome dot
+ org.
+
+-->
+</head>
+<body>
+<div id="app">
+  <div class="titlebar">
+    <div class="appmark">&#x25A6;</div>
+    <button class="filebtn" id="fileBtn" title="File menu">File</button>
+    <div class="title" id="docTitle">untitled - GlyphPoint</div>
+    <div class="quick">
+      <button id="qUndo" title="Undo (Ctrl+Z)" aria-label="Undo">&#x21B6;</button>
+      <button id="qRedo" title="Redo (Ctrl+Y)" aria-label="Redo">&#x21B7;</button>
+      <button id="uiModeToggle" class="modeToggle" title="Switch between ribbon and classic side-panel interfaces"><span id="uiModeIcon">&#x25EB;</span><span id="uiModeLabel">Classic</span></button>
+    </div>
+  </div>
+
+  <div class="ribbonwrap">
+    <div class="ribbon homeRibbon" id="homeRibbon">
+      <section class="group grp-tools">
+        <div class="toolgrid">
+          <button class="toolbtn active" data-tool="pencil" title="Pencil"><svg viewBox="0 0 16 16"><path d="m3 12 1-4 7-7 3 3-7 7-4 1Z"/><path d="m9.5 2.5 3 3M4 8l4 4"/></svg></button>
+          <button class="toolbtn" data-tool="fill" title="Flood fill"><svg viewBox="0 0 16 16"><path d="m2 8 5-5 5 5-5 5-5-5Z"/><path d="M4 6h6M13 8.5s-2 2.2-2 3.5a2 2 0 0 0 4 0c0-1.3-2-3.5-2-3.5Z"/></svg></button>
+          <button class="toolbtn" data-tool="text" title="Text"><svg viewBox="0 0 16 16"><path d="M3 3h10M8 3v10M5 13h6"/></svg></button>
+          <button class="toolbtn" data-tool="eraser" title="Eraser"><svg viewBox="0 0 16 16"><path d="m2 10 6-7 6 5-5 5H5l-3-3Z"/><path d="M7 13h7"/></svg></button>
+          <button class="toolbtn" data-tool="picker" title="Pick glyph from field"><svg viewBox="0 0 16 16"><path d="m10 2 4 4-7.5 7.5H3v-3.5L10 2Z"/><path d="M8.5 3.5 12.5 7.5M2 14h5"/></svg></button>
+          <button class="toolbtn" data-tool="magnifier" title="Magnifier"><svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 4 4M7 4.5v5M4.5 7h5"/></svg></button>
+        </div>
+      </section>
+
+      <section class="group grp-glyph">
+        <div class="glyphstack">
+          <div class="gp-top">
+            <div class="gp-slots">
+              <div class="gp-slot" title="Primary glyph — left mouse"><span class="gp-slot-label">1</span><span class="gp-slot-char" id="slotPrimaryChar">#</span></div>
+              <div class="gp-slot" title="Secondary glyph — right mouse"><span class="gp-slot-label">2</span><span class="gp-slot-char" id="slotSecondaryChar">+</span></div>
+            </div>
+            <div class="gp-grid" id="glyphPalette"></div>
+          </div>
+          <div class="gp-ctrl">
+            <button id="gpEditBtn" title="Edit palette. Changes are saved locally in this browser.">Edit</button>
+            <button id="gpResetBtn" title="Restore the default palette" hidden>Reset</button>
+            <button id="gpColoursBtn" title="Open the Glyph Colour Manager">Colours&hellip;</button>
+            <span class="grow"></span>
+            <label class="palette-bgctl" title="Canvas background colour">Background <input type="color" id="fieldBgInput" value="#000000"></label>
+            <span class="gp-edit-hint" id="gpEditHint" hidden>click=edit · right-click=remove</span>
+            <button id="gpBgBtn" title="Toggle palette tile contrast">&#x25D0;</button>
+          </div>
+          <div class="brushrow">
+            <label for="brushSize">Size</label><input id="brushSize" type="number" min="1" max="60" step="1" value="1" list="brushSizeOptions" title="Choose a common size or enter 1–60"><datalist id="brushSizeOptions"><option value="1"><option value="2"><option value="3"><option value="4"><option value="5"><option value="6"><option value="7"><option value="8"><option value="9"><option value="10"><option value="12"><option value="16"><option value="20"></datalist>
+            <span class="brushshape"><span class="brushshape-label">Tip</span><button class="bsbtn" data-bs="circle" title="Circular brush">&#x25CB;</button><button class="bsbtn active" data-bs="square" title="Square brush">&#x25A1;</button><button class="bsbtn ratio" data-bs="rect31" title="3:1 rectangular brush"><span class="ratio-shape horizontal short"></span></button><button class="bsbtn ratio" data-bs="rect51" title="5:1 rectangular brush"><span class="ratio-shape horizontal long"></span></button><button class="bsbtn ratio" data-bs="rect13" title="1:3 rectangular brush"><span class="ratio-shape vertical short"></span></button><button class="bsbtn ratio" data-bs="rect15" title="1:5 rectangular brush"><span class="ratio-shape vertical long"></span></button></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="group grp-shapes">
+        <div class="shapegrid" id="shapeGrid"></div>
+        <div class="options">
+          <label>Stroke</label><select id="outlineMode"><option value="rough" selected>Glyph</option><option value="solid">Lines</option><option value="none">None</option></select>
+          <label>Fill</label><select id="fillMode"><option value="none">None</option><option value="glyph">Primary</option><option value="secondary">Secondary</option></select>
+          <label>Width</label><select id="shapeSize"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select>
+        </div>
+      </section>
+
+      <section class="group grp-clipboard">
+        <div class="iconrow">
+          <button class="smallbtn iconbtn" id="copyBtn" title="Copy selection (Ctrl+C)" aria-label="Copy selection"><svg viewBox="0 0 16 16"><rect x="5" y="5" width="8" height="8"/><path d="M3 11H2.5A1.5 1.5 0 0 1 1 9.5v-7A1.5 1.5 0 0 1 2.5 1h7A1.5 1.5 0 0 1 11 2.5V3"/></svg></button>
+          <button class="smallbtn iconbtn" id="cutBtn" title="Cut selection (Ctrl+X)" aria-label="Cut selection"><svg viewBox="0 0 16 16"><circle cx="4" cy="4" r="2"/><circle cx="4" cy="12" r="2"/><path d="M5.5 5.5 13 13M5.5 10.5 13 3"/></svg></button>
+          <button class="smallbtn iconbtn" id="pasteBtn" title="Paste (Ctrl+V)" aria-label="Paste"><svg viewBox="0 0 16 16"><path d="M5 3h6v2H5z"/><path d="M4 4H2.5A1.5 1.5 0 0 0 1 5.5v8A1.5 1.5 0 0 0 2.5 15h9a1.5 1.5 0 0 0 1.5-1.5V6"/><path d="M7 8h7v6H7z"/></svg></button>
+        </div>
+      </section>
+
+      <section class="group grp-selection">
+        <button id="selectBtn" title="Selection tool"><svg viewBox="0 0 16 16"><path stroke-dasharray="2 2" d="M2 2h12v12H2z"/></svg><span>Select</span></button>
+        <div class="smallcol">
+          <select id="selectMode" title="Selection geometry"><option value="rect">Rectangular selection</option><option value="free">Free-form selection</option></select>
+          <div class="sel-grid">
+            <button class="smallbtn" id="selectAllBtn" title="Select entire field">All</button>
+            <button class="smallbtn" id="cropBtn" title="Crop field to selection">Crop</button>
+            <button class="smallbtn" id="deleteBtn" title="Clear selected cells">Clear</button>
+            <button class="smallbtn" id="resizeBtn" title="Resize or skew field">Resize</button>
+          </div>
+          <label class="sel-chk" title="When moving or pasting, skip blank cells"><input id="transparentRibbon" type="checkbox" checked> Ignore blanks</label>
+        </div>
+      </section>
+
+      <section class="group grp-transform">
+        <div class="transformgrid">
+          <button class="xformbtn rotbtn" data-transform="rot90" title="Rotate 90 degrees clockwise" aria-label="Rotate 90 degrees clockwise">&#x21BB;</button>
+          <button class="xformbtn rotbtn" data-transform="rot270" title="Rotate 90 degrees anticlockwise" aria-label="Rotate 90 degrees anticlockwise">&#x21BA;</button>
+          <button class="xformbtn" data-transform="rot180" title="Rotate 180 degrees">180&deg;</button>
+          <button class="xformbtn" data-transform="flipH" title="Mirror horizontally">&#x21C6;</button>
+          <button class="xformbtn" data-transform="flipV" title="Mirror vertically">&#x21C5;</button>
+        </div>
+      </section>
+
+      <section class="group grp-view">
+        <div class="viewcompact">
+          <div class="viewbuttons">
+            <button class="viewbtn" id="zoomIn" title="Zoom in" aria-label="Zoom in">+</button>
+            <button class="viewbtn" id="zoomOut" title="Zoom out" aria-label="Zoom out">&minus;</button>
+            <button class="viewbtn textwide" id="zoom100" title="Reset zoom to 100%">1:1</button>
+            <button class="viewbtn" id="fullscreen" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 16 16"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg></button>
+          </div>
+          <div class="viewopts">
+            <label><input type="checkbox" id="gridToggle" checked> Grid</label>
+            <label><input type="checkbox" id="rulerToggle" checked> Rulers</label>
+            <label><input type="checkbox" id="statusToggle" checked> Status</label>
+            <button class="squarebtn" id="squareToggle" type="button" aria-pressed="false" title="Toggle square pixels">Square pixels</button>
+          </div>
+
+        </div>
+      </section>
+      <div class="group grp-workflow" aria-label="Editing workflow">
+        <div class="smallcol"><button id="focusCanvasBtn" class="smallbtn">Focus field</button><button id="cellStyleBtn" class="smallbtn">Cell colours</button><button id="recoverBtn" class="smallbtn">Recovery</button></div>
+        <div class="smallcol"><button id="secondaryToggle" class="smallbtn" aria-pressed="false">Use secondary glyph</button><button id="panToggle" class="smallbtn" aria-pressed="false">Pan field</button><label for="edgePolicy">Edges <select id="edgePolicy"><option value="expand">Expand to fit</option><option value="reject">Reject overflow</option><option value="clip">Clip overflow</option></select></label></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="workspace" id="workspace">
+    <div class="rulerCorner"></div><div class="hruler" id="hruler"></div><div class="vruler" id="vruler"></div>
+    <div class="scroller" id="scroller"><div class="canvasWrap" id="canvasWrap" tabindex="0" role="grid" aria-label="GlyphPoint editable field" aria-describedby="canvasHelp" aria-activedescendant="activeCell" aria-multiselectable="true"><canvas id="canvasGrid" aria-hidden="true"></canvas><canvas id="canvasOverlay" aria-hidden="true"></canvas><div class="sr-only" role="row" id="activeRow" aria-rowindex="1"><span role="gridcell" id="activeCell" aria-colindex="1"></span></div></div></div>
+  </div>
+
+  <div class="statusbar" id="statusbar"><span id="cursorStat">0, 0</span><span id="selectStat"></span><span id="sizeStat">80 &times; 80 cells</span><span id="recoveryStatus" role="status" aria-live="polite">Recovery ready</span><span class="grow" id="msgStat" role="status" aria-live="polite">Ready</span><div class="zoomCtl"><button id="zminus">&minus;</button><input id="zoomSlider" aria-label="Canvas zoom percentage" type="range" min="25" max="800" value="100" step="25"><button id="zplus">+</button><span id="zoomLabel">100%</span></div></div>
+</div>
+
+<p class="sr-only" id="canvasHelp">Arrow keys move by cell. Shift plus arrows selects. Space paints; Shift plus Space paints the secondary glyph. Enter opens text entry. Delete clears the selection or focused cell. Home and End move within a row; Control or Command plus Home or End moves to the document edges. Use Tab to leave the field. File, Readable text opens an accessible text view.</p>
+<p class="sr-only" id="cellAnnouncement" role="status" aria-live="polite"></p>
+<div id="jobPanel" hidden><span id="jobLabel" role="status"></span><button id="cancelJob">Cancel operation</button></div>
+<img id="printImage" alt="GlyphPoint artwork prepared for printing">
+<div class="dropdown" id="fileMenu">
+  <button data-file="new">New <span style="float:right" class="kbd">Ctrl+N</span></button>
+  <button data-file="openProject">Open GlyphPoint project&hellip;</button>
+  <button data-file="openTxt">Open plain text&hellip;</button>
+  <button data-file="openHtml">Open coloured HTML&hellip;</button>
+  <hr>
+  <button data-file="saveProject">Save project <span style="float:right" class="kbd">Ctrl+S</span></button>
+  <button data-file="saveAs">Save project as&hellip;</button>
+  <button data-file="downloadProject">Download project JSON&hellip;</button>
+  <button data-file="recover">Recovery checkpoints&hellip;</button>
+  <button data-file="exportPNG">Export PNG image&hellip;</button>
+  <button data-file="textView">Readable text / copy all&hellip;</button>
+  <button data-file="cellStyle">Cell colours&hellip;</button>
+  <button data-file="exportTxt">Export plain text&hellip;</button>
+  <button data-file="exportHtml">Export standalone HTML&hellip;</button>
+  <hr>
+  <button data-file="properties">Properties</button>
+  <button data-file="colourManager">Glyph Colour Manager&hellip;</button>
+  <button data-file="print">Print&hellip; <span style="float:right" class="kbd">Ctrl+P</span></button>
+  <button data-file="help">Help / shortcuts</button>
+</div>
+
+<div class="cpick" id="colorPicker" hidden>
+  <div class="cpick-head">
+    <span class="cpick-swatch" id="cpickSwatch"></span>
+    <input class="cpick-hex" id="cpickHexInput" value="#808080" spellcheck="false" title="Hex colour">
+  </div>
+  <label><span>Hue</span><input type="range" id="cpickH" min="0" max="360" value="0" step="any"></label>
+  <label><span>Saturation</span><input type="range" id="cpickSat" min="0" max="255" value="128" step="any"></label>
+  <label><span>Luminosity</span><input type="range" id="cpickL" min="0" max="255" value="128" step="any"></label>
+  <div class="cpick-presets" id="cpickPresets"></div>
+</div>
+
+<input type="file" id="openProjectInput" accept=".json,.glyphpoint.json,application/json" hidden>
+<input type="file" id="openTxtInput" accept=".txt,text/plain" hidden>
+<input type="file" id="openHtmlInput" accept=".html,.htm,text/html" hidden>
+
+<dialog id="resizeDialog">
+  <div class="dlgTitle">Resize and Skew</div><div class="dlgBody">
+    <div class="dlgGrid">
+      <label>Resize by</label><select id="resizeUnit"><option value="pixels">Cells</option><option value="percent">Percentage</option></select>
+      <label>Horizontal</label><input type="number" id="resizeW" min="1" value="80">
+      <label>Vertical</label><input type="number" id="resizeH" min="1" value="80">
+      <label>Maintain aspect ratio</label><input type="checkbox" id="keepAspect" checked>
+      <label>Skew horizontal (&deg;)</label><input type="number" id="skewX" min="-89" max="89" value="0">
+      <label>Skew vertical (&deg;)</label><input type="number" id="skewY" min="-89" max="89" value="0">
+      <label for="resizeEdges">Skew edges</label><select id="resizeEdges"><option value="expand">Expand to fit (recommended)</option><option value="reject">Reject overflow</option><option value="clip">Clip to resized field</option></select>
+      <p class="hint" style="grid-column:1/-1">Resize samples the source into the requested size. Skew applies horizontal then vertical shear using inverse sampling. Expand keeps the transformed bounds; large results are rejected before changing the document.</p>
+    </div>
+  </div><div class="dlgActions"><button value="cancel">Cancel</button><button id="applyResize" value="default">OK</button></div>
+</dialog>
+
+<dialog id="textDialog">
+  <div class="dlgTitle">Text</div><div class="dlgBody">
+    <textarea id="textValue" aria-label="Text to place on the canvas" class="textArea" placeholder="Type text&hellip;"></textarea>
+    <div class="dlgGrid" style="margin-top:10px">
+      <label>Font</label><select id="textFont"><option value="DejaVu Sans Mono">DejaVu Sans Mono (embedded)</option><option>Cascadia Mono</option><option>Consolas</option><option>Courier New</option><option>monospace</option></select>
+      <label>Scale</label><select id="textScale"><option value="1">1&times;</option><option value="2">2&times;</option><option value="3">3&times;</option></select>
+      <label>Style</label><div><label><input type="checkbox" id="textBold"> Bold</label> <label><input type="checkbox" id="textItalic"> Italic</label> <label><input type="checkbox" id="textUnderline"> Underline</label></div>
+      <label>Background</label><select id="textBg"><option value="transparent">Transparent</option><option value="opaque">Opaque</option></select>
+    </div>
+  </div><div class="dlgActions"><button value="cancel">Cancel</button><button id="applyText" value="default">Place text</button></div>
+</dialog>
+
+<dialog id="propertiesDialog">
+  <div class="dlgTitle">Image Properties</div><div class="dlgBody"><div class="dlgGrid">
+    <label>Width (cells)</label><input type="number" id="propW" min="1">
+    <label>Height (cells)</label><input type="number" id="propH" min="1">
+    <label>Field background</label><input type="color" id="propBg">
+    <label>Glyphs only</label><input type="checkbox" id="transparentSelect">
+  </div></div><div class="dlgActions"><button value="cancel">Cancel</button><button id="applyProps">OK</button></div>
+</dialog>
+
+
+<dialog id="paletteDialog">
+  <div class="dlgTitle" id="paletteDlgTitle">Palette glyph</div>
+  <div class="dlgBody">
+    <div class="paletteEditRow"><label for="paletteGlyphInput">Glyph</label><input id="paletteGlyphInput" maxlength="64" autocomplete="off" spellcheck="false"><label for="paletteColourInput">Colour</label><input id="paletteColourInput" type="color" value="#ffffff"></div>
+    <div class="dialogHint">Enter one Unicode character and choose its colour. Palette edits are saved locally and reused the next time GlyphPoint opens.</div>
+  </div>
+  <div class="dlgActions"><button id="paletteRemoveBtn" class="danger">Remove</button><span class="grow"></span><button value="cancel">Cancel</button><button id="paletteApplyBtn">Save</button></div>
+</dialog>
+
+<dialog id="glyphColourManagerDialog" class="gcm-dialog">
+  <div class="gcm-titlebar">
+    <button class="gcm-menubtn" id="gcmFileBtn">File ▾</button>
+    <button class="gcm-menubtn" id="gcmThemeBtn">Colourway ▾</button>
+    <span class="gcm-titletext">Glyph Colour Manager</span>
+    <button class="gcm-closex" id="gcmCloseX" title="Close" aria-label="Close">×</button>
+  </div>
+  <div class="gcm-menu" id="gcmFileMenu">
+    <button data-gcm-file="import">Import palette or project…</button>
+    <button data-gcm-file="export">Export palette…</button>
+  </div>
+  <div class="gcm-menu" id="gcmThemeMenu"></div>
+  <div class="dlgBody">
+    <div class="gcm-toolbar">
+      <input id="gcmSearch" type="search" placeholder="Search glyphs, labels or hex colours" aria-label="Search glyph colours">
+      <select id="gcmSort" aria-label="Sort glyph colours"><option value="order">Palette order</option><option value="glyph">Glyph</option><option value="colour">Colour</option><option value="usage">Usage</option><option value="represents">Represents</option></select>
+    </div>
+    <div class="gcm-list" id="gcmList"></div><div class="gcm-status" id="gcmStatus"></div>
+  </div>
+  <div class="dlgActions"><button id="gcmAdd">Add glyph</button><button id="gcmResetAll">Reset all colours</button><button id="gcmRevert">Revert changes</button><span class="gcm-spacer"></span><button id="gcmClose">Close</button></div>
+</dialog>
+<input type="file" id="gcmImportInput" accept=".json,.glyphpoint.json,application/json" hidden>
+<dialog id="helpDialog"><div class="dlgTitle">GlyphPoint help</div><div class="dlgBody helpcols" id="helpBody"></div><div class="dlgActions"><button value="cancel">Close</button></div></dialog>
+
+<dialog id="cellStyleDialog" aria-labelledby="cellStyleTitle">
+  <div class="dlgTitle" id="cellStyleTitle">Cell and brush colours</div><div class="dlgBody">
+  <p>Palette colours remain the default. Custom colours belong to individual cells and travel with them through copy, transforms, and save.</p>
+  <div class="dlgGrid"><label for="styleFgMode">Foreground</label><div><select id="styleFgMode"><option value="inherit">Inherit glyph palette</option><option value="custom">Custom cell colour</option></select><input type="color" id="styleFg" aria-label="Custom cell foreground"></div>
+  <label for="styleBgMode">Background</label><div><select id="styleBgMode"><option value="inherit">Inherit field background</option><option value="custom">Custom cell background</option></select><input type="color" id="styleBg" aria-label="Custom cell background"></div></div>
+  <p id="styleTarget"></p><button id="portableFont">Use embedded font for selection / field</button>
+  </div><div class="dlgActions"><button value="cancel">Cancel</button><button id="setBrushStyle">Use for next strokes</button><button id="applyCellStyle">Apply to cells</button></div>
+</dialog>
+<dialog id="recoveryDialog" aria-labelledby="recoveryTitle"><div class="dlgTitle" id="recoveryTitle">Recovery checkpoints</div><div class="dlgBody"><p id="recoveryHelp" role="status"></p><div id="recoveryList"></div></div><div class="dlgActions"><button value="cancel">Close</button></div></dialog>
+<dialog id="textViewDialog" aria-labelledby="textViewTitle"><div class="dlgTitle" id="textViewTitle">Readable text</div><div class="dlgBody"><p>This text view contains every row. Formatting remains in project JSON and HTML exports.</p><textarea id="readableText" aria-label="Complete document as text" readonly spellcheck="false"></textarea><p id="textViewStatus" role="status"></p></div><div class="dlgActions"><button value="cancel">Close</button><button id="textViewCopy">Copy all</button><button id="textViewExport">Export text</button></div></dialog>
+<script>
+/* GLYPHPOINT_APPLICATION */
+</script>
+</body>
+</html>

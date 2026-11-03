@@ -153,7 +153,7 @@ After an edit, GlyphPoint normally stores a local checkpoint about **750 ms afte
 3. Find the intended name, size, and timestamp, then choose **Recover**.
 4. Confirm replacement if needed, check the restored drawing, and save a project file.
 
-Recovery does not silently replace the startup canvas. It keeps the latest checkpoint for each tab/document session, with at most **12 entries**, **32 MiB total project payload**, and **16 MiB per entry**. Older entries can be evicted. **Delete checkpoint** removes the archive entry after confirmation and does not delete a project file.
+Recovery does not silently replace the startup canvas. It keeps the latest checkpoint for each tab/document session, with at most **12 entries**, **32 MiB total stored recovery payload**, and **16 MiB per entry**. Large repetitive canvases use lossless local recovery compression, while highly detailed ones may exceed the archive budget; keep a separate JSON backup. Older entries can be evicted. **Delete checkpoint** removes the archive entry after confirmation and does not delete a project file.
 
 Browser data clearing, private windows, quota limits, and separate origins can affect availability. A process that stops before a write completes can lose its newest changes. Keep file copies for important work and transfers; recovery does not include Undo history or synchronize across devices.
 

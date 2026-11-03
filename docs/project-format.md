@@ -42,9 +42,9 @@ The writer produces `format: "glyphpoint-v2"`. A minimal complete project is:
 | `format` | Reader accepts `glyphpoint-v1` and `glyphpoint-v2`; writer uses v2. |
 | `cols`, `rows` | Required positive integer dimensions within both axis and area budgets. |
 | `cells` | Required flat row-major array, exactly `cols * rows` records. Index is `y * cols + x`. |
-| `glyphPalette` | Optional array; defaults to the built-in palette if absent. Used glyphs and reserved space are added during normalization when capacity allows. |
+| `glyphPalette` | Optional array; defaults to the built-in palette if absent or null. Used glyphs and reserved space are added during normalization when capacity allows. |
 | `glyphPrimary`, `glyphSecondary` | Optional active drawing choices. Must be present in the normalized palette to be selected; otherwise fall back to available entries. |
-| `fieldBg` | Six-digit `#rrggbb` colour; defaults to `defaultBg` from v1, then black. Invalid supplied values are rejected. |
+| `fieldBg` | Six-digit `#rrggbb` colour; when absent or null, defaults to `defaultBg` from v1, then black. Invalid non-null values are rejected. |
 | `square` | Optional boolean; false if absent. A supplied non-boolean is rejected. |
 
 `docName`, dirty state, history, clipboard, selection, zoom, UI mode, tool choices, and open dialogs are not persisted in the project payload. The opened filename becomes the document name. Unknown object fields are not copied into application state.
@@ -79,7 +79,7 @@ These are allocation bounds for a DOM-based editor, not performance guarantees. 
 
 ## Compatibility
 
-Both recognized schema strings use the same current validation path. Legacy string palette entries and `glyphColours` mappings remain readable. Missing fonts/formatting flags receive safe defaults; `defaultBg` is recognized when `fieldBg` is absent. Unsupported font metadata cannot become HTML attributes or arbitrary CSS.
+Both recognized schema strings use the same current validation path. Legacy string palette entries and `glyphColours` mappings remain readable. Missing fonts/formatting flags receive safe defaults; `defaultBg` is recognized when `fieldBg` is absent or null. Unsupported font metadata cannot become HTML attributes or arbitrary CSS.
 
 The current reader does not reproduce arbitrary old per-cell foreground/background rendering: GlyphPoint's current model assigns one foreground colour to each glyph and one background to the field. JSON export retains valid legacy metadata, but the visible rendering follows the palette. Keep an original file if conversion fidelity matters.
 
@@ -93,7 +93,10 @@ Old malformed files that declared impossible dimensions, mismatched cell counts,
 {
   "format": "glyphpoint-v2",
   "kind": "palette",
-  "glyphPalette": [{"glyph":"A","colour":"#ffffff","represents":""}],
+  "glyphPalette": [
+    {"glyph":"A","colour":"#ffffff","represents":""},
+    {"glyph":" ","colour":"#000000","represents":""}
+  ],
   "glyphPrimary": "A",
   "glyphSecondary": "A",
   "fieldBg": "#000000"

@@ -60,7 +60,7 @@ See [the format reference](project-format.md) for field-level behavior and inten
 
 The Node suite executes actual application functions extracted from the maintained HTML, omitting startup and stubbing rendering. **32 deterministic editor/file regressions passed locally** after the repairs. They cover geometry, free selections, clipping, async clipboard behavior, keyboard isolation, full history, reserved-space/palette capacity, reused glyphs, and history budgets.
 
-Against the original baseline, 15 of the first 16 regressions failed; the pre-existing Unicode copy-content test passed. This establishes that the suite detects the principal original bugs rather than merely mirroring the new implementation. The baseline comparison is narrower than the final expanded suite.
+Against the original baseline, 15 of the first 16 regressions failed; the Unicode copy-content regression passed on the baseline. This establishes that the suite detects the principal original bugs rather than merely mirroring the new implementation. The baseline comparison is narrower than the final expanded suite.
 
 `npm run check` parses the complete shipped JavaScript, checks static IDs/self-containment, and validates local Markdown links and heading references. The suite has no runtime package dependency.
 
@@ -70,7 +70,7 @@ The twelve Chromium workflow scenarios passed locally under **Playwright 1.56.1 
 
 The browser harness records and blocks external HTTP(S) attempts and fails unexpected requests and uncaught page errors. The hostile fixtures produced neither executable effects nor requested resources. This is test evidence for those paths, not a proof covering arbitrary future changes.
 
-Matching **Firefox 142.0.1** was installed locally, but the local execution environment rejected creation of its sandboxed content process (`/proc/self/uid_map: EPERM`). Its sandbox was not disabled and this local lane is **not counted as passing**. The same Firefox suite is included in GitHub Actions for qualification on the standard Ubuntu runner.
+Matching **Firefox 142.0.1** was installed locally, but the local execution environment rejected creation of its sandboxed content process (`/proc/self/uid_map: EPERM`). Its sandbox was not disabled and this local lane is **not counted as passing**. The same Firefox suite subsequently passed on the standard Ubuntu GitHub Actions runner, as recorded below.
 
 The twelve scenarios include real-pointer cancellation/secondary drawing, appearance undo, invalid Properties/Resize preservation, and transparent text. Classic sidebar containment was checked at 1440 × 720 and through repeated height changes after repairing scrollbar-gutter clipping. The exact final count and CI result belong to the tested commit's workflow logs; do not infer a remote pass from a local Chromium pass.
 
@@ -78,7 +78,9 @@ The twelve scenarios include real-pointer cancellation/secondary drawing, appear
 
 [Quality](../.github/workflows/quality.yml) contains two bounded jobs: source/docs/editor tests, and Chromium plus Firefox workflows. It uses Node 24, exact Playwright/lockfile versions, pinned action commit IDs, read-only repository permissions, per-ref concurrency cancellation, and finite timeouts. It runs on PRs and pushes to `main`; branch pushes do not duplicate PR runs.
 
-Consult [GitHub Actions](https://github.com/techrote/GlyphPoint/actions/workflows/quality.yml) for the exact PR/main commit and conclusion. This audit records the local execution boundary honestly; it does not label an unobserved hosted run as successful.
+On 3 November 2026, [hosted run 41699814029](https://github.com/techrote/GlyphPoint/actions/runs/41699814029) completed successfully for PR #1 head `e8a962996da11f0e961984f91833acdce6af0d43`. Both jobs succeeded. The inspected logs record **32 Node regression passes, 12 Chromium scenario passes, and 12 Firefox scenario passes**. The runtime was independently reviewed at that head with no remaining merge blocker. The subsequent documentation corrections do not change the runtime.
+
+Consult [GitHub Actions](https://github.com/techrote/GlyphPoint/actions/workflows/quality.yml) and [PR #1](https://github.com/techrote/GlyphPoint/pull/1) for final-head and post-merge provenance. The local Firefox sandbox failure above remains a local-environment limitation; it is distinct from the successful hosted Firefox qualification.
 
 ## Documentation delivered
 

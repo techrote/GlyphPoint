@@ -521,9 +521,23 @@ async function runBrowser(browserName) {
         await input.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
         await input.detach();
       }else{
-        // Playwright exposes touch taps on these engines; pointer dragging checks
-        // the same pan handlers without claiming a physical touch-device test.
-        await page.mouse.move(start.x,start.y);await page.mouse.down();await page.mouse.move(end.x,end.y,{steps:4});await page.mouse.up();
+        // Firefox/WebKit Playwright provide touch taps but no drag-injection
+        // API equivalent to Chromium CDP. Exercise the real DOM pointer event
+        // handlers with controlled synthetic events, not a misleading fallback
+        // mouse drag in a touch-emulated context. This is not device acceptance.
+        const started=await page.evaluate(({start,end})=>{
+          const canvas=document.querySelector('#canvasGrid'),capture=canvas.setPointerCapture;
+          const gesture={bubbles:true,cancelable:true,pointerType:'touch',pointerId:109,button:0,buttons:1,isPrimary:true};
+          canvas.setPointerCapture=()=>{}; // Synthetic pointers are not registered for capture.
+          try{
+            canvas.dispatchEvent(new PointerEvent('pointerdown',{...gesture,clientX:start.x,clientY:start.y}));
+            const active=Boolean(state.panGesture);
+            document.dispatchEvent(new PointerEvent('pointermove',{...gesture,clientX:end.x,clientY:end.y}));
+            document.dispatchEvent(new PointerEvent('pointerup',{...gesture,clientX:end.x,clientY:end.y,buttons:0}));
+            return active;
+          }finally{canvas.setPointerCapture=capture}
+        },{start,end});
+        assert.equal(started,true,'Synthetic pointerdown enters the pan gesture');
       }
       await page.evaluate(()=>renderer.whenIdle());
       const scroll=await page.locator('#scroller').evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}));

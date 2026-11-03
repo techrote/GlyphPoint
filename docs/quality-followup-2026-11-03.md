@@ -50,7 +50,7 @@ Independent review also verified ZIP CRCs, safe/unique members, every per-file h
 
 Hosted exact-candidate results will be recorded in the integration PR and linked here after the complete configured profiles finish. A local Chromium pass is not substituted for the remote results.
 
-The hosted profiles are Linux Chromium/Firefox/WebKit full workflows, Windows Chromium smoke, and macOS WebKit smoke. Local Firefox cannot create its sandboxed content process in this environment; local WebKit lacks system libraries. Browser sandbox protections were not disabled to obtain passes. These local limitations do not establish a hosted pass or failure.
+The hosted profiles are Linux Chromium/Firefox/WebKit full workflows, Windows Chromium smoke, and macOS WebKit smoke. Firefox/WebKit simulated pan handlers are exercised with controlled synthetic PointerEvents; Chromium uses protocol touch injection. A synthetic handler check does not establish real-device touch or pointer-capture acceptance. Local Firefox cannot create its sandboxed content process in this environment; local WebKit lacks system libraries. Browser sandbox protections were not disabled to obtain passes. These local limitations do not establish a hosted pass or failure.
 
 ## Remaining decisions and physical acceptance
 

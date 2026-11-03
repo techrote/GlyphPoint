@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GlyphPoint v10 — Precision Glyph Grid Editor</title>
+<title>GlyphPoint — Precision Glyph Grid Editor</title>
 <style>
 :root{
   color-scheme:light;
@@ -211,9 +211,9 @@ dialog{border:1px solid #888;border-radius:2px;box-shadow:0 6px 30px #0006;paddi
 #app.classic .bgctl input[type=color]{width:44px;height:24px}
 
 @media(max-width:1100px){#app:not(.classic){grid-template-rows:30px 138px minmax(0,1fr) 24px}.ribbon{overflow-x:auto}}
-#app.classic .ribbonwrap.classic-overflow{overflow-y:scroll;overflow-x:hidden}#app.classic .ribbonwrap.classic-overflow .ribbon{width:220px;min-height:max-content;padding-bottom:12px}#app.classic .ribbonwrap.classic-overflow .group{width:214px}#app.classic .ribbonwrap:not(.classic-overflow){overflow:hidden}#app.classic .ribbonwrap:not(.classic-overflow) .ribbon{width:100%}
+#app.classic:has(.ribbonwrap.classic-overflow){grid-template-columns:254px minmax(0,1fr)}#app.classic .ribbonwrap.classic-overflow{overflow-y:scroll;overflow-x:hidden;scrollbar-gutter:stable}#app.classic .ribbonwrap.classic-overflow .ribbon{width:236px;min-height:max-content;padding-bottom:12px}#app.classic .ribbonwrap.classic-overflow .group{width:228px}#app.classic .ribbonwrap:not(.classic-overflow){overflow:hidden}#app.classic .ribbonwrap:not(.classic-overflow) .ribbon{width:100%}
 
-@media print{.titlebar,.ribbonwrap,.statusbar,.rulerCorner,.hruler,.vruler{display:none!important}#app,#app.classic{display:block;background:#fff}.workspace,#app.classic .workspace{display:block;background:#fff}.scroller{padding:0;overflow:visible}.canvasWrap{box-shadow:none;transform:none!important}}
+@media print{html,body{height:auto;overflow:visible}#app,#app.classic,.workspace{height:auto;overflow:visible}.titlebar,.ribbonwrap,.statusbar,.rulerCorner,.hruler,.vruler{display:none!important}#app,#app.classic{display:block;background:#fff}.workspace,#app.classic .workspace{display:block;background:#fff}.scroller{padding:0;overflow:visible}.canvasWrap{box-shadow:none;transform:none!important}}
 </style>
 </head>
 <body>
@@ -330,10 +330,10 @@ dialog{border:1px solid #888;border-radius:2px;box-shadow:0 6px 30px #0006;paddi
 
   <div class="workspace" id="workspace">
     <div class="rulerCorner"></div><div class="hruler" id="hruler"></div><div class="vruler" id="vruler"></div>
-    <div class="scroller" id="scroller"><div class="canvasWrap" id="canvasWrap"><div id="canvasGrid" aria-label="Glyph painting canvas"></div></div></div>
+    <div class="scroller" id="scroller"><div class="canvasWrap" id="canvasWrap"><div id="canvasGrid" role="img" aria-label="Glyph painting canvas; use mouse or pointer to draw"></div></div></div>
   </div>
 
-  <div class="statusbar" id="statusbar"><span id="cursorStat">0, 0</span><span id="selectStat"></span><span id="sizeStat">80 &times; 80 cells</span><span class="grow" id="msgStat">Ready</span><div class="zoomCtl"><button id="zminus">&minus;</button><input id="zoomSlider" type="range" min="25" max="800" value="100" step="25"><button id="zplus">+</button><span id="zoomLabel">100%</span></div></div>
+  <div class="statusbar" id="statusbar"><span id="cursorStat">0, 0</span><span id="selectStat"></span><span id="sizeStat">80 &times; 80 cells</span><span class="grow" id="msgStat" role="status" aria-live="polite">Ready</span><div class="zoomCtl"><button id="zminus">&minus;</button><input id="zoomSlider" aria-label="Canvas zoom percentage" type="range" min="25" max="800" value="100" step="25"><button id="zplus">+</button><span id="zoomLabel">100%</span></div></div>
 </div>
 
 <div class="dropdown" id="fileMenu">
@@ -382,7 +382,7 @@ dialog{border:1px solid #888;border-radius:2px;box-shadow:0 6px 30px #0006;paddi
 
 <dialog id="textDialog">
   <div class="dlgTitle">Text</div><div class="dlgBody">
-    <textarea id="textValue" class="textArea" placeholder="Type text&hellip;"></textarea>
+    <textarea id="textValue" aria-label="Text to place on the canvas" class="textArea" placeholder="Type text&hellip;"></textarea>
     <div class="dlgGrid" style="margin-top:10px">
       <label>Font</label><select id="textFont"><option>Cascadia Mono</option><option>Consolas</option><option>Courier New</option><option>monospace</option></select>
       <label>Scale</label><select id="textScale"><option value="1">1&times;</option><option value="2">2&times;</option><option value="3">3&times;</option></select>
@@ -443,6 +443,30 @@ const $$ = s => [...document.querySelectorAll(s)];
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const deepCell = c => ({...c});
 const makeCell=(ch=' ')=>({ch,fg:'',bg:'',font:'Cascadia Mono',bold:false,italic:false,underline:false});
+// Bound DOM allocation and retained history. Validate before replacing a document.
+const MAX_DIMENSION=512,MAX_CELLS=65536,MAX_FILE_BYTES=16*1024*1024,MAX_PALETTE=4096;
+const MAX_HISTORY=60,MAX_HISTORY_CELLS=262144;
+let importGeneration=0,documentRevision=0,preferencesUnavailable=false;
+function validateDimensions(cols,rows){
+  if(!Number.isInteger(cols)||!Number.isInteger(rows)||cols<1||rows<1||cols>MAX_DIMENSION||rows>MAX_DIMENSION||cols*rows>MAX_CELLS)
+    throw Error(`Use whole-number dimensions from 1 to ${MAX_DIMENSION}, with at most ${MAX_CELLS.toLocaleString()} cells in total.`);
+  return {cols,rows};
+}
+function validGlyph(ch){return typeof ch==='string'&&[...ch].length===1&&!/[\u0000-\u001f\u007f-\u009f\ud800-\udfff\u2028\u2029]/u.test(ch)}
+const SAFE_FONTS=['Cascadia Mono','Cascadia Code','Consolas','Courier New','DejaVu Sans Mono','monospace'];
+function normaliseFont(font){return SAFE_FONTS.includes(font)?font:'Cascadia Mono'}
+function normaliseCell(c){
+  if(!c||typeof c!=='object'||!validGlyph(c.ch))throw Error('Each cell must contain exactly one printable Unicode code point.');
+  return {ch:c.ch,fg:validColour(c.fg)?c.fg.toLowerCase():'',bg:validColour(c.bg)?c.bg.toLowerCase():'',font:normaliseFont(c.font),bold:c.bold===true,italic:c.italic===true,underline:c.underline===true};
+}
+function includeUsedGlyphs(palette,cells){
+  const seen=new Set(palette.map(e=>e.glyph));
+  for(const c of cells)if(!seen.has(c.ch)){
+    if(palette.length>=MAX_PALETTE)throw Error(`A document supports at most ${MAX_PALETTE} distinct palette glyphs.`);
+    palette.push({glyph:c.ch,colour:validColour(c.fg)?c.fg:defaultColourForGlyph(c.ch),represents:''});seen.add(c.ch);
+  }
+  return palette;
+}
 let hoveredCells=[];
 
 const DEFAULT_GLYPH_CHARS=['#','.','+','~','*','X','O','@',' ','=','-','|','>','<','^','o','x'];
@@ -474,6 +498,9 @@ function init(){
   newDocument(80,80,false);
   buildShapes();bindUI();setUiMode(state.uiMode,false);setZoom(1);setTool('pencil');renderRulers();setMessage('Ready');
   buildGlyphPalette();buildColourPresets();
+  $$('button[title]').forEach(b=>{if(!b.getAttribute('aria-label'))b.setAttribute('aria-label',b.title)});
+  $$('dialog').forEach(d=>{const title=d.querySelector('.dlgTitle,.gcm-titletext');if(title){if(!title.id)title.id=d.id+'Title';d.setAttribute('aria-labelledby',title.id)}});
+  $$('.dlgGrid>label,.options>label').forEach(label=>{const input=label.nextElementSibling;if(input&&/^(INPUT|SELECT|TEXTAREA)$/.test(input.tagName)&&input.id)label.htmlFor=input.id});
   state.grid=true;$('#canvasGrid').classList.add('gridlines');$('#gridToggle').checked=true;
   $('#fieldBgInput').value=state.fieldBg;$('#squareToggle').setAttribute('aria-pressed',state.square);
 }
@@ -481,27 +508,35 @@ function safeStorageGet(key){try{return localStorage.getItem(key)}catch{return n
 function safeStorageSet(key,value){try{localStorage.setItem(key,value);return true}catch{return false}}
 function validColour(v){return /^#[0-9a-f]{6}$/i.test(String(v||''))}
 function normalisePalette(list,legacyColours={}){
+  if(!Array.isArray(list))throw Error('Palette must be an array.');
+  if(list.length>MAX_PALETTE)throw Error(`A palette supports at most ${MAX_PALETTE} entries.`);
   const out=[],seen=new Set();
-  for(const raw of Array.isArray(list)?list:[]){
+  for(const raw of list){
     const source=raw&&typeof raw==='object'?raw:{};
-    const glyph=[...String(source.glyph??raw??'')][0];
-    if(glyph===undefined||seen.has(glyph))continue;
-    const fallback=legacyColours[glyph]||defaultColourForGlyph(glyph);
+    const glyph=source.glyph??raw;
+    if(!validGlyph(glyph))throw Error('Palette entries must contain one printable Unicode code point.');
+    if(seen.has(glyph))throw Error('Palette contains a duplicate glyph.');
+    const legacy=legacyColours?.[glyph],fallback=validColour(legacy)?legacy.toLowerCase():defaultColourForGlyph(glyph);
     out.push({glyph,colour:validColour(source.colour)?source.colour.toLowerCase():fallback,represents:typeof source.represents==='string'?source.represents.slice(0,80):''});seen.add(glyph);
-    if(out.length>=72)break;
   }
+  if(!seen.has(' ')){if(out.length>=MAX_PALETTE)throw Error('Palette needs room for the reserved space glyph.');out.push({glyph:' ',colour:'#000000',represents:''})}
   return out;
 }
 function paletteEntry(ch){return state.glyphPalette.find(e=>e.glyph===ch)||null}
 function defaultColourForGlyph(ch){return DEFAULT_GLYPH_PALETTE.find(e=>e.glyph===ch)?.colour||'#ffffff'}
 function getGlyphColour(ch){return /^\s$/u.test(ch||'')?state.fieldBg:(paletteEntry(ch)?.colour||'#ffffff')}
 function refreshGlyphColourUI(){renderAll();buildGlyphPalette();buildGlyphColourPanel()}
-function setGlyphColour(ch,colour,{persist=true,refresh=true}={}){
-  let entry=paletteEntry(ch);if(!entry){entry={glyph:ch,colour:'#ffffff',represents:''};state.glyphPalette.push(entry)}
-  entry.colour=validColour(colour)?colour.toLowerCase():'#ffffff';
-  if(persist)savePalettePrefs();if(refresh)refreshGlyphColourUI();return entry.colour;
+
+function setGlyphColour(ch,colour,{persist=true,refresh=true,record=true}={}){
+  if(!validGlyph(ch)||!validColour(colour))return null;
+  let entry=paletteEntry(ch);const next=colour.toLowerCase();
+  if(entry?.colour===next)return next;
+  if(!entry&&state.glyphPalette.length>=MAX_PALETTE){setMessage('Palette limit reached');return null}
+  if(record)snapshot();
+  if(!entry){entry={glyph:ch,colour:'#ffffff',represents:''};state.glyphPalette.push(entry)}
+  entry.colour=next;markDirty();if(persist)savePalettePrefs();if(refresh)refreshGlyphColourUI();return entry.colour;
 }
-function ensureGlyphEntry(ch,colour='#ffffff'){if(ch===undefined||paletteEntry(ch))return false;state.glyphPalette.push({glyph:ch,colour:validColour(colour)?colour.toLowerCase():'#ffffff',represents:''});return true}
+function ensureGlyphEntry(ch,colour=defaultColourForGlyph(ch)){if(!validGlyph(ch)||paletteEntry(ch))return false;if(state.glyphPalette.length>=MAX_PALETTE)return false;state.glyphPalette.push({glyph:ch,colour:validColour(colour)?colour.toLowerCase():'#ffffff',represents:''});return true}
 function loadLocalPrefs(){
   try{const raw=safeStorageGet(PREFS_KEY)||safeStorageGet(LEGACY_PREFS_KEY);if(raw){const p=JSON.parse(raw),pal=normalisePalette(p.palette,p.glyphColours||{});if(pal.length)state.glyphPalette=pal;if(typeof p.primary==='string')state.glyphPrimary=[...p.primary][0]??'#';if(typeof p.secondary==='string')state.glyphSecondary=[...p.secondary][0]??'+';if(p.bgMode==='grey'||p.bgMode==='invert')state.paletteBgMode=p.bgMode}}
   catch{}
@@ -511,11 +546,10 @@ function loadLocalPrefs(){
   if(!glyphs.includes(state.glyphSecondary))state.glyphSecondary=glyphs[1]??state.glyphPrimary;
   state.drawGlyph=state.glyphPrimary;
 }
-function savePalettePrefs(){safeStorageSet(PREFS_KEY,JSON.stringify({palette:state.glyphPalette,primary:state.glyphPrimary,secondary:state.glyphSecondary,bgMode:state.paletteBgMode}))}
+function savePalettePrefs(){const saved=safeStorageSet(PREFS_KEY,JSON.stringify({palette:state.glyphPalette,primary:state.glyphPrimary,secondary:state.glyphSecondary,bgMode:state.paletteBgMode}));preferencesUnavailable=!saved;if(!saved)setMessage('Palette changes are available for this session.');return saved}
 function updateClassicOverflow(){
   const wrap=document.querySelector('#app.classic .ribbonwrap'),ribbon=document.querySelector('#app.classic .ribbon');
   if(!wrap||!ribbon)return;
-  wrap.classList.remove('classic-overflow');
   requestAnimationFrame(()=>{const needs=ribbon.scrollHeight>wrap.clientHeight+1;wrap.classList.toggle('classic-overflow',needs)});
 }
 function setUiMode(mode,persist=true){
@@ -523,18 +557,19 @@ function setUiMode(mode,persist=true){
   const classic=state.uiMode==='classic',app=$('#app');app.classList.toggle('classic',classic);document.body.classList.toggle('ui-classic',classic);
   const label=$('#uiModeLabel'),icon=$('#uiModeIcon');if(label)label.textContent=classic?'Ribbon':'Classic';if(icon)icon.textContent=classic?'▰':'◫';
   $('#uiModeToggle')?.setAttribute('title',classic?'Switch to compact ribbon interface':'Switch to Win98-style side-panel interface');
-  if(persist)safeStorageSet(UI_MODE_KEY,state.uiMode);
+  if(persist&&!safeStorageSet(UI_MODE_KEY,state.uiMode)){preferencesUnavailable=true;setMessage('Interface choice is available for this session.');}
   requestAnimationFrame(()=>{renderRulers();setZoom(state.zoom);updateClassicOverflow()});
 }
 
 function newDocument(cols=80,rows=80,push=true){
+  validateDimensions(cols,rows);importGeneration++;documentRevision++;
   if(push) snapshot();state.cols=cols;state.rows=rows;state.cells=Array.from({length:cols*rows},()=>makeCell(' '));
-  state.selection=null;state.preview.clear();state.docName='untitled';state.dirty=false;rebuildGrid();updateTitle();
+  state.selection=null;state.drawing=false;state.moveSelection=null;state.textAnchor=null;state.preview.clear();state.docName='untitled';state.dirty=false;rebuildGrid();updateTitle();
 }
 function idx(x,y){return y*state.cols+x} function xy(i){return [i%state.cols,Math.floor(i/state.cols)]}
 function inBounds(x,y){return x>=0&&y>=0&&x<state.cols&&y<state.rows}
 function getCell(x,y){return inBounds(x,y)?state.cells[idx(x,y)]:null}
-function setCell(x,y,patch){if(!inBounds(x,y))return;const i=idx(x,y),prev=state.cells[i].ch;if(prev!==patch.ch){if(state.glyphCounts[prev]>0)state.glyphCounts[prev]--;state.glyphCounts[patch.ch]=(state.glyphCounts[patch.ch]||0)+1;}Object.assign(state.cells[i],patch);renderCellIndex(i);autoAddGlyph(patch.ch);state.dirty=true}
+function setCell(x,y,patch){if(!inBounds(x,y)||!validGlyph(patch.ch))return;if(!paletteEntry(patch.ch)&&state.glyphPalette.length>=MAX_PALETTE){setMessage('Palette limit reached; remove an unused glyph before adding another.');return}const i=idx(x,y),prev=state.cells[i].ch;if(prev!==patch.ch){if(state.glyphCounts[prev]>0)state.glyphCounts[prev]--;state.glyphCounts[patch.ch]=(state.glyphCounts[patch.ch]||0)+1;}Object.assign(state.cells[i],patch);autoAddGlyph(patch.ch);renderCellIndex(i);state.dirty=true}
 function rebuildGrid(){
   const g=$('#canvasGrid');g.innerHTML='';g.style.gridTemplateColumns=state.square?`repeat(${state.cols},1em)`:`repeat(${state.cols},1ch)`;
   g.classList.toggle('squarecells',state.square);
@@ -544,7 +579,7 @@ function rebuildGrid(){
   state.knownGlyphs=new Set(state.cells.map(c=>c.ch));
   state.glyphCounts={};let paletteChanged=false;for(const c of state.cells){state.glyphCounts[c.ch]=(state.glyphCounts[c.ch]||0)+1;paletteChanged=ensureGlyphEntry(c.ch)||paletteChanged}
   if(paletteChanged)savePalettePrefs();
-  renderAll();updateStats();renderRulers();buildGlyphPalette();buildGlyphColourPanel();
+  renderAll();updateStats();setZoom(state.zoom);buildGlyphPalette();buildGlyphColourPanel();
 }
 function renderAll(){for(let i=0;i<state.cells.length;i++)renderCellIndex(i);renderSelection();renderPreview()}
 function renderCell(x,y){renderCellIndex(idx(x,y))}
@@ -564,33 +599,42 @@ function paletteContrast(col){
   return invertHex(col);
 }
 function autoAddGlyph(ch){
-  if(!ch)return;
-  if(!state.knownGlyphs.has(ch)){
-    state.knownGlyphs.add(ch);
-    if(ensureGlyphEntry(ch)){savePalettePrefs();buildGlyphPalette()}
-    buildGlyphColourPanel();
-    return;
-  }
-  const rows=$$('.gc-row');
-  for(const row of rows)if(row.querySelector('.gc-ch').textContent===displayGlyph(ch)){
-    row.querySelector('.gc-count').textContent=state.glyphCounts[ch]||0;break;
-  }
+  if(!validGlyph(ch))return;state.knownGlyphs.add(ch);
+  if(ensureGlyphEntry(ch)){savePalettePrefs();buildGlyphPalette()}
+  const panel=$('#glyphColourPanel');if(panel)buildGlyphColourPanel();
 }
 function displayGlyph(ch){return ch===' '?'\u2423':ch}
 function updateStats(){ $('#sizeStat').textContent=`${state.cols} \u00D7 ${state.rows} cells`; if(state.selection){const s=selectionBounds();$('#selectStat').textContent=`${s.w} \u00D7 ${s.h} selected`}else $('#selectStat').textContent=''; }
 function updateTitle(){ $('#docTitle').textContent=`${state.dirty?'*':''}${state.docName} - GlyphPoint` }
-function markDirty(){state.dirty=true;updateTitle()}
-function setMessage(s){$('#msgStat').textContent=s}
+function markDirty(){state.dirty=true;documentRevision++;updateTitle()}
+function setMessage(s){$('#msgStat').textContent=s+(preferencesUnavailable?' Browser storage is unavailable; download a project or palette to keep changes.':'')}
 
-function snapshot(){
-  state.history.push({cols:state.cols,rows:state.rows,cells:state.cells.map(deepCell),selection:state.selection?JSON.parse(JSON.stringify(state.selection)):null,glyphPalette:state.glyphPalette.map(e=>({...e}))});
-  if(state.history.length>60)state.history.shift();state.future.length=0;
+
+function captureDocument(){
+  return {cols:state.cols,rows:state.rows,cells:state.cells.map(deepCell),selection:state.selection?JSON.parse(JSON.stringify(state.selection)):null,
+    glyphPalette:state.glyphPalette.map(e=>({...e})),glyphPrimary:state.glyphPrimary,glyphSecondary:state.glyphSecondary,
+    fieldBg:state.fieldBg,square:state.square,docName:state.docName,transparentSelect:state.transparentSelect};
 }
-function restore(s){state.cols=s.cols;state.rows=s.rows;state.cells=s.cells.map(deepCell);state.selection=s.selection?JSON.parse(JSON.stringify(s.selection)):null;if(s.glyphPalette)state.glyphPalette=normalisePalette(s.glyphPalette);rebuildGrid();markDirty()}
-function undo(){if(!state.history.length)return;state.future.push({cols:state.cols,rows:state.rows,cells:state.cells.map(deepCell),selection:state.selection?JSON.parse(JSON.stringify(state.selection)):null,glyphPalette:state.glyphPalette.map(e=>({...e}))});restore(state.history.pop());setMessage('Undo')}
-function redo(){if(!state.future.length)return;state.history.push({cols:state.cols,rows:state.rows,cells:state.cells.map(deepCell),selection:state.selection?JSON.parse(JSON.stringify(state.selection)):null,glyphPalette:state.glyphPalette.map(e=>({...e}))});restore(state.future.pop());setMessage('Redo')}
-
-
+function trimHistory(){
+  let count=state.history.reduce((n,s)=>n+s.cells.length,0)+state.future.reduce((n,s)=>n+s.cells.length,0);
+  while(state.history.length+state.future.length>MAX_HISTORY||count>MAX_HISTORY_CELLS){
+    const stack=state.history.length>1?state.history:state.future.length?state.future:state.history;
+    if(!stack.length)break;count-=stack.shift().cells.length;
+  }
+}
+function snapshot(){state.history.push(captureDocument());state.future.length=0;trimHistory()}
+function syncDocumentControls(){
+  $('#fieldBgInput').value=state.fieldBg;$('#squareToggle').setAttribute('aria-pressed',state.square);
+  $('#transparentRibbon').checked=state.transparentSelect;$('#transparentSelect').checked=state.transparentSelect;
+}
+function restore(s){
+  for(const key of ['cols','rows','fieldBg','square','docName','transparentSelect','glyphPrimary','glyphSecondary'])if(key in s)state[key]=s[key];
+  state.cells=s.cells.map(deepCell);state.selection=s.selection?JSON.parse(JSON.stringify(s.selection)):null;
+  state.glyphPalette=s.glyphPalette.map(e=>({...e}));state.drawGlyph=state.glyphPrimary;
+  state.drawing=false;state.moveSelection=null;clearPreview();syncDocumentControls();savePalettePrefs();rebuildGrid();markDirty();
+}
+function undo(){if(!state.history.length)return;state.future.push(captureDocument());restore(state.history.pop());trimHistory();setMessage('Undo')}
+function redo(){if(!state.future.length)return;state.history.push(captureDocument());restore(state.future.pop());trimHistory();setMessage('Redo')}
 let gcmOpeningSnapshot=null;
 const GCM_COLOURWAYS={
   'Pastel':DEFAULT_GLYPH_COLOURS,
@@ -608,13 +652,16 @@ function getGlyphManagerRows(){
   if(sort==='glyph')rows.sort((a,b)=>a.entry.glyph.localeCompare(b.entry.glyph));else if(sort==='colour')rows.sort((a,b)=>a.entry.colour.localeCompare(b.entry.colour));else if(sort==='usage')rows.sort((a,b)=>b.usage-a.usage||a.index-b.index);else if(sort==='represents')rows.sort((a,b)=>(a.entry.represents||'').localeCompare(b.entry.represents||''));return rows;
 }
 function setGcmStatus(message){const el=$('#gcmStatus');if(el)el.textContent=message}
-function replacePaletteGlyph(oldGlyph,newGlyph){
-  newGlyph=[...String(newGlyph||'')][0];if(!newGlyph||isWhitespaceGlyph(newGlyph))return{ok:false,message:'Enter one non-whitespace glyph'};
+
+function replacePaletteGlyph(oldGlyph,newGlyph,{record=true}={}){
+  if(oldGlyph===' ')return{ok:false,message:'Space is reserved for blank cells'};
+  if(!validGlyph(newGlyph)||isWhitespaceGlyph(newGlyph))return{ok:false,message:'Enter one non-whitespace Unicode code point'};
   if(newGlyph!==oldGlyph&&paletteEntry(newGlyph))return{ok:false,message:'That glyph is already in the palette'};
-  const entry=paletteEntry(oldGlyph);if(!entry)return{ok:false,message:'Glyph not found'};entry.glyph=newGlyph;
+  const entry=paletteEntry(oldGlyph);if(!entry)return{ok:false,message:'Glyph not found'};
+  if(newGlyph===oldGlyph)return{ok:true};if(record)snapshot();entry.glyph=newGlyph;
   for(const c of state.cells)if(c.ch===oldGlyph)c.ch=newGlyph;
-  if(state.glyphPrimary===oldGlyph)state.glyphPrimary=newGlyph;if(state.glyphSecondary===oldGlyph)state.glyphSecondary=newGlyph;if(state.drawGlyph===oldGlyph)state.drawGlyph=newGlyph;
-  state.knownGlyphs.delete(oldGlyph);state.knownGlyphs.add(newGlyph);savePalettePrefs();rebuildGrid();return{ok:true};
+  if(state.glyphPrimary===oldGlyph)state.glyphPrimary=newGlyph;if(state.glyphSecondary===oldGlyph)state.glyphSecondary=newGlyph;
+  state.drawGlyph=state.glyphPrimary;savePalettePrefs();rebuildGrid();markDirty();return{ok:true};
 }
 function renderGlyphColourManager(){
   const list=$('#gcmList');if(!list)return;list.replaceChildren();const head=document.createElement('div');head.className='gcm-head';['Glyph','Colour','Hex','Uses','Represents','Actions'].forEach(t=>{const x=document.createElement('span');x.textContent=t;head.appendChild(x)});list.appendChild(head);
@@ -627,24 +674,43 @@ function renderGlyphColourManager(){
     const uses=document.createElement('span');uses.textContent=String(usage);
     const represents=document.createElement('input');represents.className='gcm-represents';represents.value=entry.represents||'';represents.maxLength=80;represents.placeholder='Label…';
     const actions=document.createElement('span');actions.className='gcm-actions';const reset=document.createElement('button');reset.textContent='Reset';const remove=document.createElement('button');remove.textContent='Remove';remove.disabled=state.glyphPalette.filter(e=>!isWhitespaceGlyph(e.glyph)).length<=1;
-    const commitGlyph=()=>{const next=[...glyph.value][0];const result=replacePaletteGlyph(entry.glyph,next);glyph.classList.toggle('invalid',!result.ok);if(!result.ok){setGcmStatus(result.message);return}renderGlyphColourManager();setGcmStatus(`Replaced ${entry.glyph} with ${next}`)};glyph.onchange=commitGlyph;glyph.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();commitGlyph()}};
-    colour.oninput=()=>{hex.value=colour.value.toUpperCase();setGlyphColour(entry.glyph,colour.value,{persist:false,refresh:false});renderAll();buildGlyphPalette()};colour.onchange=()=>savePalettePrefs();
+    const commitGlyph=()=>{const old=entry.glyph,next=glyph.value;const result=replacePaletteGlyph(old,next);glyph.classList.toggle('invalid',!result.ok);if(!result.ok){setGcmStatus(result.message);return}renderGlyphColourManager();setGcmStatus(`Replaced ${old} with ${next}`)};glyph.onchange=commitGlyph;glyph.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();commitGlyph()}};
+    let colourEditing=false;colour.oninput=()=>{if(!colourEditing){snapshot();colourEditing=true}hex.value=colour.value.toUpperCase();setGlyphColour(entry.glyph,colour.value,{persist:false,refresh:false,record:false});renderAll();buildGlyphPalette()};colour.onchange=()=>{colourEditing=false;savePalettePrefs()};
     const commitHex=()=>{const v=hex.value.trim();if(!validColour(v)){hex.classList.add('invalid');setGcmStatus('Enter a six-digit hex colour');return}hex.classList.remove('invalid');colour.value=v;setGlyphColour(entry.glyph,v);hex.value=v.toUpperCase()};hex.onchange=commitHex;hex.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();commitHex()}};
-    represents.onchange=()=>{entry.represents=represents.value.trim().slice(0,80);savePalettePrefs();setGcmStatus(`Saved label for ${entry.glyph}`)};
+    represents.onchange=()=>{snapshot();entry.represents=represents.value.trim().slice(0,80);markDirty();savePalettePrefs();setGcmStatus(`Saved label for ${entry.glyph}`)};
     reset.onclick=()=>{setGlyphColour(entry.glyph,defaultColourForGlyph(entry.glyph));renderGlyphColourManager()};remove.onclick=()=>{removePaletteGlyph(state.glyphPalette.indexOf(entry));renderGlyphColourManager()};actions.append(reset,remove);row.append(glyph,colour,hex,uses,represents,actions);list.appendChild(row);
   }setGcmStatus(`${rows.length} glyphs shown. Whitespace is managed automatically from the canvas background.`);
 }
 function closeGcmMenus(){ $$('.gcm-menu').forEach(m=>m.classList.remove('open')) }
 function openGcmMenu(button,menu){closeGcmMenus();const r=button.getBoundingClientRect();menu.style.left=r.left+'px';menu.style.top=r.bottom+'px';menu.classList.add('open')}
 function buildGcmThemeMenu(){const menu=$('#gcmThemeMenu');menu.replaceChildren();for(const name of Object.keys(GCM_COLOURWAYS)){const b=document.createElement('button');b.textContent=name;b.onclick=()=>{applyGcmColourway(name);closeGcmMenus()};menu.appendChild(b)}}
-function applyGcmColourway(name){const colours=GCM_COLOURWAYS[name];if(!colours)return;let i=0;for(const entry of state.glyphPalette){if(isWhitespaceGlyph(entry.glyph))continue;entry.colour=colours[i++%colours.length]}savePalettePrefs();refreshGlyphColourUI();renderGlyphColourManager();setGcmStatus(`Applied ${name} colourway`)}
-function openGlyphColourManager(){gcmOpeningSnapshot={palette:state.glyphPalette.map(e=>({...e})),primary:state.glyphPrimary,secondary:state.glyphSecondary};$('#gcmSearch').value='';$('#gcmSort').value='order';buildGcmThemeMenu();renderGlyphColourManager();$('#glyphColourManagerDialog').showModal()}
+function applyGcmColourway(name){const colours=GCM_COLOURWAYS[name];if(!colours)return;snapshot();let i=0;for(const entry of state.glyphPalette){if(isWhitespaceGlyph(entry.glyph))continue;entry.colour=colours[i++%colours.length]}markDirty();savePalettePrefs();refreshGlyphColourUI();renderGlyphColourManager();setGcmStatus(`Applied ${name} colourway`)}
+
+function openGlyphColourManager(){gcmOpeningSnapshot=captureDocument();$('#gcmSearch').value='';$('#gcmSort').value='order';buildGcmThemeMenu();renderGlyphColourManager();$('#glyphColourManagerDialog').showModal()}
 function closeGlyphColourManager(){closeGcmMenus();$('#glyphColourManagerDialog').close();gcmOpeningSnapshot=null}
 function addGlyphFromManager(){state.paletteEditIndex=null;$('#paletteDlgTitle').textContent='Add palette glyph';$('#paletteGlyphInput').value='';$('#paletteColourInput').value='#ffffff';$('#paletteRemoveBtn').hidden=true;$('#paletteDialog').showModal();setTimeout(()=>$('#paletteGlyphInput').focus(),0)}
-function resetAllGlyphColours(){if(!confirm('Reset all glyph colours?'))return;for(const e of state.glyphPalette)if(!isWhitespaceGlyph(e.glyph))e.colour=defaultColourForGlyph(e.glyph);savePalettePrefs();refreshGlyphColourUI();renderGlyphColourManager()}
-function revertGlyphManager(){if(!gcmOpeningSnapshot)return;state.glyphPalette=gcmOpeningSnapshot.palette.map(e=>({...e}));state.glyphPrimary=gcmOpeningSnapshot.primary;state.glyphSecondary=gcmOpeningSnapshot.secondary;state.drawGlyph=state.glyphPrimary;savePalettePrefs();refreshGlyphColourUI();renderGlyphColourManager();setGcmStatus('Changes reverted')}
+function resetAllGlyphColours(){if(!confirm('Reset all glyph colours?'))return;snapshot();for(const e of state.glyphPalette)if(!isWhitespaceGlyph(e.glyph))e.colour=defaultColourForGlyph(e.glyph);markDirty();savePalettePrefs();refreshGlyphColourUI();renderGlyphColourManager()}
+
+function revertGlyphManager(){if(!gcmOpeningSnapshot)return;snapshot();restore(gcmOpeningSnapshot);renderGlyphColourManager();setGcmStatus('Opening document and palette restored; Undo can recover the changes.')}
 function exportGlyphPalette(){const payload={format:'glyphpoint-v2',kind:'palette',glyphPalette:state.glyphPalette,glyphPrimary:state.glyphPrimary,glyphSecondary:state.glyphSecondary,fieldBg:state.fieldBg};downloadBlob(JSON.stringify(payload,null,2),'application/json','glyphpoint-palette.json');setGcmStatus('Palette exported')}
-async function importGlyphPaletteFile(e){const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!['glyphpoint-v1','glyphpoint-v2'].includes(d.format)||!Array.isArray(d.glyphPalette))throw Error('No compatible GlyphPoint palette found');const pal=normalisePalette(d.glyphPalette,d.glyphColours||{});if(!pal.length)throw Error('Palette is empty');state.glyphPalette=pal;if(d.glyphPrimary&&paletteEntry(d.glyphPrimary))state.glyphPrimary=d.glyphPrimary;if(d.glyphSecondary&&paletteEntry(d.glyphSecondary))state.glyphSecondary=d.glyphSecondary;if(validColour(d.fieldBg))state.fieldBg=d.fieldBg.toLowerCase();$('#fieldBgInput').value=state.fieldBg;savePalettePrefs();refreshGlyphColourUI();renderGlyphColourManager();setGcmStatus(`Imported palette from ${f.name}`)}catch(err){alert('Could not import palette: '+err.message)}e.target.value=''}
+
+async function importGlyphPaletteFile(e){
+  const f=e.target.files[0];if(!f)return;e.target.value='';const generation=++importGeneration;
+  try{
+    const d=JSON.parse(await readImportFile(f));
+    if(!d||!['glyphpoint-v1','glyphpoint-v2'].includes(d.format)||!Array.isArray(d.glyphPalette))throw Error('No compatible GlyphPoint palette found');
+    if(!d.glyphPalette.length)throw Error('Palette is empty');
+    const pal=normalisePalette(d.glyphPalette,d.glyphColours||{}),seen=new Set(pal.map(x=>x.glyph)),used=new Set(state.cells.map(c=>c.ch));
+    for(const entry of state.glyphPalette)if(!seen.has(entry.glyph)&&used.has(entry.glyph)){if(pal.length>=MAX_PALETTE)throw Error('Palette has no room for glyphs used on the canvas');pal.push({...entry});seen.add(entry.glyph)}
+    includeUsedGlyphs(pal,state.cells);
+    if(!pal.length)throw Error('Palette is empty');if(generation!==importGeneration)return;
+    snapshot();state.glyphPalette=pal;
+    state.glyphPrimary=pal.some(x=>x.glyph===d.glyphPrimary)?d.glyphPrimary:pal[0].glyph;
+    state.glyphSecondary=pal.some(x=>x.glyph===d.glyphSecondary)?d.glyphSecondary:(pal[1]||pal[0]).glyph;
+    state.drawGlyph=state.glyphPrimary;if(validColour(d.fieldBg))state.fieldBg=d.fieldBg.toLowerCase();
+    syncDocumentControls();savePalettePrefs();refreshGlyphColourUI();renderGlyphColourManager();markDirty();setGcmStatus(`Imported palette from ${f.name}`);
+  }catch(err){alert('Could not import palette: '+err.message)}
+}
 function buildGlyphPalette(){
   const grid=$('#glyphPalette');if(!grid)return;grid.innerHTML='';
   state.glyphPalette.forEach((entry,i)=>{
@@ -674,18 +740,44 @@ function openPaletteEditor(index){
   state.paletteEditIndex=Number.isInteger(index)?index:null;const dlg=$('#paletteDialog'),input=$('#paletteGlyphInput'),remove=$('#paletteRemoveBtn');
   const editing=state.paletteEditIndex!==null;const entry=editing?state.glyphPalette[state.paletteEditIndex]:null;$('#paletteDlgTitle').textContent=editing?'Edit palette glyph':'Add palette glyph';input.value=entry?.glyph||'';$('#paletteColourInput').value=entry?.colour||'#ffffff';remove.hidden=!editing;dlg.showModal();setTimeout(()=>{input.focus();input.select()},0)
 }
+
 function applyPaletteEditor(){
-  const ch=paletteInputGlyph(),colour=$('#paletteColourInput').value;if(ch===undefined){setMessage('Enter one glyph');return}
+  const ch=$('#paletteGlyphInput').value,colour=$('#paletteColourInput').value;
+  if(!validGlyph(ch)){alert('Enter exactly one printable Unicode code point.');return}
   const i=state.paletteEditIndex,duplicate=state.glyphPalette.findIndex(e=>e.glyph===ch);
-  if(i===null){if(duplicate>=0){setMessage('Glyph is already in the palette');return}state.glyphPalette.push({glyph:ch,colour:validColour(colour)?colour:'#ffffff',represents:''})}
-  else{if(duplicate>=0&&duplicate!==i){setMessage('Glyph is already in the palette');return}const old=state.glyphPalette[i].glyph;state.glyphPalette[i]={glyph:ch,colour:validColour(colour)?colour:'#ffffff',represents:state.glyphPalette[i].represents||''};if(state.glyphPrimary===old)state.glyphPrimary=ch;if(state.glyphSecondary===old)state.glyphSecondary=ch}
-  savePalettePrefs();$('#paletteDialog').close();refreshGlyphColourUI();if($('#glyphColourManagerDialog')?.open)renderGlyphColourManager();setMessage('Palette saved locally')
+  if(duplicate>=0&&duplicate!==i){alert('Glyph is already in the palette.');return}
+  if(i!==null&&state.glyphPalette[i].glyph===' '&&ch!==' '){alert('Space is reserved for blank cells.');return}
+  if(i===null&&state.glyphPalette.length>=MAX_PALETTE){alert('Palette limit reached.');return}
+  snapshot();
+  if(i===null)state.glyphPalette.push({glyph:ch,colour:validColour(colour)?colour:'#ffffff',represents:''});
+  else{
+    const entry=state.glyphPalette[i],old=entry.glyph;entry.glyph=ch;entry.colour=validColour(colour)?colour:'#ffffff';
+    for(const c of state.cells)if(c.ch===old)c.ch=ch;
+    if(state.glyphPrimary===old)state.glyphPrimary=ch;if(state.glyphSecondary===old)state.glyphSecondary=ch;
+  }
+  state.drawGlyph=state.glyphPrimary;markDirty();savePalettePrefs();$('#paletteDialog').close();rebuildGrid();
+  if($('#glyphColourManagerDialog')?.open)renderGlyphColourManager();setMessage('Palette updated; save the project to keep document changes.');
 }
+
 function removePaletteGlyph(index=state.paletteEditIndex){
-  if(!Number.isInteger(index)||index<0||index>=state.glyphPalette.length)return;if(state.glyphPalette.length<=1){setMessage('Palette must contain at least one glyph');return}
-  const old=state.glyphPalette[index].glyph;state.glyphPalette.splice(index,1);if(state.glyphPrimary===old)state.glyphPrimary=state.glyphPalette[0].glyph;if(state.glyphSecondary===old)state.glyphSecondary=state.glyphPalette[Math.min(1,state.glyphPalette.length-1)].glyph;savePalettePrefs();if($('#paletteDialog')?.open)$('#paletteDialog').close();buildGlyphPalette();setMessage('Glyph removed; palette saved locally')
+  if(!Number.isInteger(index)||index<0||index>=state.glyphPalette.length)return;
+  if(state.glyphPalette.length<=1){setMessage('Palette must contain at least one glyph');return}
+  const old=state.glyphPalette[index].glyph;
+  if(old===' '){alert('Space is reserved for blank cells.');return}
+  if(state.cells.some(c=>c.ch===old)){alert('This glyph is in use on the canvas. Replace or erase it before removing its palette entry.');return}
+  snapshot();state.glyphPalette.splice(index,1);
+  if(state.glyphPrimary===old)state.glyphPrimary=state.glyphPalette[0].glyph;
+  if(state.glyphSecondary===old)state.glyphSecondary=state.glyphPalette[Math.min(1,state.glyphPalette.length-1)].glyph;
+  state.drawGlyph=state.glyphPrimary;markDirty();savePalettePrefs();if($('#paletteDialog')?.open)$('#paletteDialog').close();refreshGlyphColourUI();setMessage('Unused glyph removed');
 }
-function resetPalette(){if(!confirm('Restore the default GlyphPoint palette?'))return;state.glyphPalette=DEFAULT_GLYPH_PALETTE.map(e=>({...e}));state.glyphPrimary='#';state.glyphSecondary='+';state.drawGlyph='#';savePalettePrefs();buildGlyphPalette();setMessage('Default palette restored')}
+function resetPalette(){
+  if(!confirm('Restore the default palette and colours? Glyphs used on the canvas will be retained.'))return;
+  const used=new Set([' ',...state.cells.map(c=>c.ch)]);
+  const pal=[...used].map(glyph=>({glyph,colour:defaultColourForGlyph(glyph),represents:''}));
+  for(const entry of DEFAULT_GLYPH_PALETTE)if(!used.has(entry.glyph)&&pal.length<MAX_PALETTE)pal.push({...entry});
+  snapshot();state.glyphPalette=pal;
+  state.glyphPrimary=paletteEntry('#')?'#':pal[0].glyph;state.glyphSecondary=paletteEntry('+')?'+':state.glyphPrimary;state.drawGlyph=state.glyphPrimary;markDirty();savePalettePrefs();refreshGlyphColourUI();setMessage('Default palette restored; used glyphs retained');
+}
 function setPrimaryGlyph(ch){state.glyphPrimary=ch;state.drawGlyph=ch;savePalettePrefs();buildGlyphPalette();setMessage(`Primary glyph: ${displayGlyph(ch)}`)}
 function setSecondaryGlyph(ch){state.glyphSecondary=ch;savePalettePrefs();buildGlyphPalette();setMessage(`Secondary glyph: ${displayGlyph(ch)}`)}
 function setDrawGlyph(e){return e.button===2?state.glyphSecondary:state.glyphPrimary}
@@ -737,9 +829,18 @@ const SHAPE_NAMES={line:'Line',rect:'Rectangle',ellipse:'Ellipse',triangle:'Tria
 function buildShapes(){const sg=$('#shapeGrid');sg.innerHTML='';for(const [id,ico] of SHAPES){const b=document.createElement('button');b.className='shape';b.dataset.shape=id;b.title=SHAPE_NAMES[id]||id;b.textContent=ico;b.onclick=()=>{state.shape=id;setTool('shape')};sg.appendChild(b)}}
 function setTool(t){state.tool=t;$$('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));$('#selectBtn').classList.toggle('active',t==='select');$$('.shape').forEach(b=>b.classList.toggle('active',t==='shape'&&b.dataset.shape===state.shape));const names={pencil:'Pencil',fill:'Flood fill',text:'Text',eraser:'Eraser',picker:'Glyph picker',magnifier:'Magnifier',select:'Selection',shape:SHAPE_NAMES[state.shape]||'Shape'};setMessage(`${names[t]||t} tool`)}
 
-function eventCell(e){let el=e.target?.closest?.('.cell');if(!el&&Number.isFinite(e.clientX))el=document.elementFromPoint(e.clientX,e.clientY)?.closest?.('.cell');if(!el)return null;const i=+el.dataset.i;return {i,x:i%state.cols,y:Math.floor(i/state.cols),el}}
+function eventCell(e){let el=e.target?.closest?.('.cell');if(!el&&Number.isFinite(e.clientX))el=document.elementFromPoint(e.clientX,e.clientY)?.closest?.('.cell');if(!el||!$('#canvasGrid').contains(el))return null;const i=+el.dataset.i;return {i,x:i%state.cols,y:Math.floor(i/state.cols),el}}
 function edgeCell(e){if(!Number.isFinite(e.clientX)&&!Number.isFinite(e.clientY))return null;const r=$('#canvasGrid').getBoundingClientRect();let x=Math.floor((e.clientX-r.left)/r.width*state.cols),y=Math.floor((e.clientY-r.top)/r.height*state.rows);x=clamp(x,0,state.cols-1);y=clamp(y,0,state.rows-1);const i=idx(x,y);return{i,x,y,el:state.els[i]}}
-function footprintOf(x,y,size,brushShape=state.brushShape){const out=[];size=Math.max(1,Math.round(size)||1);const ratio=BRUSH_RATIOS[brushShape];if(ratio){const w=size*ratio[0],h=size*ratio[1],x0=-Math.floor((w-1)/2),y0=-Math.floor((h-1)/2);for(let dy=y0;dy<y0+h;dy++)for(let dx=x0;dx<x0+w;dx++){const px=x+dx,py=y+dy;if(inBounds(px,py))out.push([px,py])}return out}const half=Math.floor(size/2);for(let dy=-half;dy<=half;dy++)for(let dx=-half;dx<=half;dx++){const px=x+dx,py=y+dy;if(!inBounds(px,py))continue;if(brushShape==='circle'&&Math.hypot(dx,dy)>size/2)continue;out.push([px,py])}return out}
+
+function footprintOf(x,y,size,brushShape=state.brushShape){
+  const out=[];size=clamp(Math.round(size)||1,1,60);const ratio=BRUSH_RATIOS[brushShape]||[1,1];
+  const w=size*ratio[0],h=size*ratio[1],x0=-Math.floor((w-1)/2),y0=-Math.floor((h-1)/2);
+  for(let dy=y0;dy<y0+h;dy++)for(let dx=x0;dx<x0+w;dx++){
+    if(brushShape==='circle'&&Math.hypot(dx-(x0+(w-1)/2),dy-(y0+(h-1)/2))>size/2)continue;
+    if(inBounds(x+dx,y+dy))out.push([x+dx,y+dy]);
+  }
+  return out;
+}
 function edgeOf(pts){const set=new Set(pts.map(p=>`${p[0]},${p[1]}`)),out=[];for(const [x,y] of pts){let e=false;for(const [nx,ny] of [[x+1,y],[x-1,y],[x,y+1],[x,y-1]])if(!inBounds(nx,ny)||!set.has(`${nx},${ny}`)){e=true;break}if(e)out.push([x,y])}return out}
 
 function bindUI(){
@@ -764,13 +865,18 @@ function bindUI(){
   $('#gcmSearch').oninput=renderGlyphColourManager;$('#gcmSort').onchange=renderGlyphColourManager;$('#gcmAdd').onclick=addGlyphFromManager;$('#gcmResetAll').onclick=resetAllGlyphColours;$('#gcmRevert').onclick=revertGlyphManager;$('#gcmClose').onclick=closeGlyphColourManager;$('#gcmCloseX').onclick=closeGlyphColourManager;$('#gcmFileBtn').onclick=e=>{e.stopPropagation();openGcmMenu(e.currentTarget,$('#gcmFileMenu'))};$('#gcmThemeBtn').onclick=e=>{e.stopPropagation();openGcmMenu(e.currentTarget,$('#gcmThemeMenu'))};$('#gcmFileMenu').onclick=e=>{const a=e.target.dataset.gcmFile;if(a==='import')$('#gcmImportInput').click();else if(a==='export')exportGlyphPalette();closeGcmMenus()};$('#gcmImportInput').onchange=importGlyphPaletteFile;document.addEventListener('pointerdown',e=>{if(!e.target.closest('.gcm-menu')&&!e.target.closest('.gcm-menubtn'))closeGcmMenus()});
   $('#canvasGrid').addEventListener('contextmenu',e=>e.preventDefault());
   $('#canvasGrid').addEventListener('pointerdown',pointerDown);document.addEventListener('pointermove',pointerMove);document.addEventListener('pointerup',pointerUp);
+  const cancelDrawing=()=>{state.drawing=false;state.moveSelection=null;clearPreview();for(const i of hoveredCells)state.els[i]?.classList.remove('hovered');hoveredCells=[]};
+  document.addEventListener('pointercancel',cancelDrawing);$('#canvasGrid').addEventListener('lostpointercapture',cancelDrawing);window.addEventListener('blur',cancelDrawing);
+  window.addEventListener('beforeunload',e=>{if(state.dirty){e.preventDefault();e.returnValue=''}});
+  $('#scroller').addEventListener('scroll',()=>{$('#hruler').scrollLeft=$('#scroller').scrollLeft;$('#vruler').scrollTop=$('#scroller').scrollTop});
   $('#zoomIn').onclick=()=>setZoom(state.zoom*2);$('#zoomOut').onclick=()=>setZoom(state.zoom/2);$('#zoom100').onclick=()=>setZoom(1);$('#zminus').onclick=()=>setZoom(state.zoom-0.25);$('#zplus').onclick=()=>setZoom(state.zoom+0.25);$('#zoomSlider').oninput=e=>setZoom(+e.target.value/100);
   $('#gridToggle').onchange=e=>{state.grid=e.target.checked;$('#canvasGrid').classList.toggle('gridlines',state.grid)};$('#rulerToggle').onchange=e=>{state.rulers=e.target.checked;$('#workspace').classList.toggle('no-rulers',!state.rulers)};$('#statusToggle').onchange=e=>{$('#statusbar').classList.toggle('hidden',!e.target.checked)};
-  $('#squareToggle').onclick=e=>{state.square=!state.square;e.currentTarget.setAttribute('aria-pressed',state.square);rebuildGrid();requestAnimationFrame(renderRulers)};$('#fieldBgInput').oninput=e=>{state.fieldBg=e.target.value;renderAll();buildGlyphPalette();markDirty()};
-  $('#fullscreen').onclick=()=>document.documentElement.requestFullscreen?.();
-  $('#resizeDialog').addEventListener('close',()=>{});$('#resizeW').addEventListener('input',()=>syncResizeAspect('w'));$('#resizeH').addEventListener('input',()=>syncResizeAspect('h'));$('#resizeUnit').addEventListener('change',openResize);$('#applyResize').onclick=e=>{e.preventDefault();applyResizeSkew();$('#resizeDialog').close()};
-  $('#applyText').onclick=e=>{e.preventDefault();placeText();$('#textDialog').close()};
-  $('#applyProps').onclick=e=>{e.preventDefault();applyProperties();$('#propertiesDialog').close()};
+  $('#squareToggle').onclick=e=>{snapshot();state.square=!state.square;e.currentTarget.setAttribute('aria-pressed',state.square);rebuildGrid();markDirty()};
+  let editingBackground=false;$('#fieldBgInput').oninput=e=>{if(!editingBackground){snapshot();editingBackground=true}state.fieldBg=e.target.value;renderAll();buildGlyphPalette();markDirty()};$('#fieldBgInput').onchange=()=>{editingBackground=false};
+  $('#fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen?.();else await document.documentElement.requestFullscreen?.()}catch{setMessage('Full screen is unavailable in this browser context.')}};
+  $('#resizeDialog').addEventListener('close',()=>{});$('#resizeW').addEventListener('input',()=>syncResizeAspect('w'));$('#resizeH').addEventListener('input',()=>syncResizeAspect('h'));$('#resizeUnit').addEventListener('change',openResize);$('#applyResize').onclick=e=>{e.preventDefault();if(applyResizeSkew())$('#resizeDialog').close()};
+  $('#applyText').onclick=e=>{e.preventDefault();if(placeText())$('#textDialog').close()};
+  $('#applyProps').onclick=e=>{e.preventDefault();if(applyProperties())$('#propertiesDialog').close()};
   $$('dialog button[value="cancel"]').forEach(b=>b.onclick=()=>b.closest('dialog').close());
   $('#openProjectInput').onchange=openProjectFile;$('#openTxtInput').onchange=openTxtFile;$('#openHtmlInput').onchange=openHtmlFile;
   $$('#fileMenu [data-file]').forEach(b=>b.onclick=()=>handleFile(b.dataset.file));
@@ -779,8 +885,9 @@ function bindUI(){
 
 
 function pointerDown(e){
+  if(e.button!==0&&e.button!==2)return;
   const p=eventCell(e);if(!p)return;e.preventDefault();$('#canvasGrid').setPointerCapture?.(e.pointerId);state.drawing=true;state.shiftHeld=!!e.shiftKey;state.drawButton=e.button;state.actionStart=p;state.lastCell=p;state.freePath=[p];
-  const g=setDrawGlyph(e);
+  const g=setDrawGlyph(e);state.drawGlyph=g;
   if(state.tool==='pencil'){state.drawGlyph=g;snapshot();paintBrush(p.x,p.y,g,true)}
   else if(state.tool==='eraser'){snapshot();eraseBrush(p.x,p.y)}
   else if(state.tool==='fill'){snapshot();floodFill(p.x,p.y,g);state.drawing=false}
@@ -832,17 +939,19 @@ function floodFill(x,y,g){
 }
 function drawLine(x0,y0,x1,y1,fn){let dx=Math.abs(x1-x0),sx=x0<x1?1:-1,dy=-Math.abs(y1-y0),sy=y0<y1?1:-1,err=dx+dy;while(true){fn(x0,y0);if(x0===x1&&y0===y1)break;const e2=2*err;if(e2>=dy){err+=dy;x0+=sx}if(e2<=dx){err+=dx;y0+=sy}}}
 function lineGlyph(x0,y0,x1,y1){const dx=x1-x0,dy=y1-y0;if(Math.abs(dx)>Math.abs(dy)*1.8)return '\u2500';if(Math.abs(dy)>Math.abs(dx)*1.8)return '\u2502';return dx*dy>=0?'\\':'/'}
-function strokePoint(x,y,ch,size){for(let oy=-Math.floor(size/2);oy<=Math.floor(size/2);oy++)for(let ox=-Math.floor(size/2);ox<=Math.floor(size/2);ox++)if(inBounds(x+ox,y+oy))setCell(x+ox,y+oy,{ch,fg:'',bg:'',font:'Cascadia Mono',bold:false,italic:false,underline:false})}
+
+function strokePoint(x,y,ch,size){for(const [px,py] of footprintOf(x,y,size,'square'))setCell(px,py,{ch,fg:'',bg:'',font:'Cascadia Mono',bold:false,italic:false,underline:false})}
 function strokeSegment(a,b,size=1){
-  const g=state.glyphPrimary;
+  const g=state.drawButton===2?state.glyphSecondary:state.glyphPrimary;
   const ch=state.outlineMode==='rough'?g:lineGlyph(a.x,a.y,b.x,b.y);
   drawLine(a.x,a.y,b.x,b.y,(x,y)=>strokePoint(x,y,ch,size))
 }
 function rectBounds(a,b){const x0=Math.min(a.x,b.x),x1=Math.max(a.x,b.x),y0=Math.min(a.y,b.y),y1=Math.max(a.y,b.y);return{x0,y0,x1,y1,w:x1-x0+1,h:y1-y0+1}}
 function snapB(a,b){const dx=b.x-a.x,dy=b.y-a.y,s=Math.max(Math.abs(dx),Math.abs(dy));if(!s)return b;const sx=dx?Math.sign(dx):1,sy=dy?Math.sign(dy):1;return{x:a.x+sx*s,y:a.y+sy*s}}
 function fillGlyph(){if(state.fillMode==='secondary')return state.glyphSecondary;return state.glyphPrimary}
-function collectOutline(edges,size){const s=new Set();const half=Math.floor(size/2);for(const [a,b] of edges)drawLine(a.x,a.y,b.x,b.y,(x,y)=>{for(let oy=-half;oy<=half;oy++)for(let ox=-half;ox<=half;ox++)if(inBounds(x+ox,y+oy))s.add(idx(x+ox,y+oy))});return s}
-function drawRingChar(ring,x,y){const up=ring.has(idx(x,y-1)),dn=ring.has(idx(x,y+1)),lf=ring.has(idx(x-1,y)),rt=ring.has(idx(x+1,y)),h=(lf?1:0)+(rt?1:0),v=(up?1:0)+(dn?1:0);if(h===0&&v===0)return state.glyphPrimary;if(h===0)return '\u2502';if(v===0)return '\u2500';if(h===1&&v===1){if(rt&&dn)return '\u250C';if(rt&&up)return '\u2514';if(lf&&dn)return '\u2510';if(lf&&up)return '\u2518'}if(h===2&&v===1)return dn?'\u252C':'\u2534';if(h===1&&v===2)return rt?'\u251C':'\u2524';return '\u253C'}
+
+function collectOutline(edges,size){const ring=new Set();for(const [a,b] of edges)drawLine(a.x,a.y,b.x,b.y,(x,y)=>{for(const [px,py] of footprintOf(x,y,size,'square'))ring.add(idx(px,py))});return ring}
+function drawRingChar(ring,x,y){const has=(x,y)=>inBounds(x,y)&&ring.has(idx(x,y));const up=has(x,y-1),dn=has(x,y+1),lf=has(x-1,y),rt=has(x+1,y),h=(lf?1:0)+(rt?1:0),v=(up?1:0)+(dn?1:0);if(h===0&&v===0)return state.glyphPrimary;if(h===0)return '\u2502';if(v===0)return '\u2500';if(h===1&&v===1){if(rt&&dn)return '\u250C';if(rt&&up)return '\u2514';if(lf&&dn)return '\u2510';if(lf&&up)return '\u2518'}if(h===2&&v===1)return dn?'\u252C':'\u2534';if(h===1&&v===2)return rt?'\u251C':'\u2524';return '\u253C'}
 function outlineRingFromRows(rows){
   const ring=new Set(),byY=new Map(rows.map(r=>[r.y,r]));
   for(const {y,min,max} of rows){
@@ -850,7 +959,7 @@ function outlineRingFromRows(rows){
     for(let x=min;x<=max;x++){
       const edgeX=x===min||x===max;
       const edgeY=!up||x<up.min||x>up.max||!dn||x<dn.min||x>dn.max;
-      if(edgeX||edgeY)ring.add(idx(x,y));
+      if((edgeX||edgeY)&&inBounds(x,y))ring.add(idx(x,y));
     }
   }
   return ring;
@@ -879,6 +988,7 @@ function arrowRows(shape,r){
 function shapeRows(shape,r){
   const x0=r.x0,x1=r.x1,y0=r.y0,y1=r.y1,w=x1-x0,h=y1-y0,aX=Math.floor((x0+x1)/2),aXR=x0+x1-aX,rows=[];
   if(shape==='rect'){for(let y=y0;y<=y1;y++)rows.push({y,min:x0,max:x1});return rows}
+  if(shape==='ellipse'&&(w===0||h===0)){for(let y=y0;y<=y1;y++)rows.push({y,min:x0,max:x1});return rows}
   if(shape==='ellipse'){const cy=(y0+y1)/2,ry=h/2,rx=w/2;for(let y=y0;y<=y1;y++){const nd=(y-cy)/ry;if(Math.abs(nd)>1)continue;const wl=Math.round(rx*Math.sqrt(Math.max(0,1-nd*nd)));rows.push({y,min:Math.max(x0,aX-wl),max:Math.min(x1,aXR+wl)})}return rows}
   if(shape==='triangle'){const H=Math.max(1,h);for(let y=y0;y<=y1;y++){const e=Math.round(w/2*(y-y0)/H);rows.push({y,min:Math.max(x0,aX-e),max:Math.min(x1,aXR+e)})}return rows}
   if(shape==='diamond'){const cy=(y0+y1)/2,ry=Math.max(1,h/2);for(let y=y0;y<=y1;y++){const e=Math.round(w/2*(1-Math.abs((y-cy)/ry)));rows.push({y,min:Math.max(x0,aX-e),max:Math.min(x1,aXR+e)})}return rows}
@@ -895,22 +1005,27 @@ function shapeEdges(shape,r){
   return {e:[[{x:x0,y:y0},{x:x1,y:y0}],[{x:x1,y:y0},{x:x1,y:y1}],[{x:x1,y:y1},{x:x0,y:y1}],[{x:x0,y:y1},{x:x0,y:y0}]]};
 }
 function enclosedFill(edges,b){const ring=collectOutline(edges,state.shapeSize),g=fillGlyph();for(let y=b.y0;y<=b.y1;y++){let min=null,max=null;for(let x=0;x<state.cols;x++){if(ring.has(idx(x,y))){if(min===null)min=x;max=x}}if(min===null)continue;for(let x=min;x<=max;x++)strokePoint(x,y,g,state.shapeSize)}}
-function strokeRing(x,y,sz,ring){const ch=state.outlineMode==='rough'?state.glyphPrimary:drawRingChar(ring,x,y);strokePoint(x,y,ch,sz)}
+function strokeRing(x,y,sz,ring){const ch=state.outlineMode==='rough'?(state.drawButton===2?state.glyphSecondary:state.glyphPrimary):drawRingChar(ring,x,y);strokePoint(x,y,ch,sz)}
+
 function drawShape(shape,a,b){
-  let r=rectBounds(a,b);
-  if(shape==='line'){strokeSegment(a,b,state.shapeSize);return}
+  const r=rectBounds(a,b);
+  if(shape==='line'||shape==='slash'||shape==='bslash'){
+    if(state.outlineMode==='none')return;
+    if(shape==='slash'){a={x:r.x1,y:r.y0};b={x:r.x0,y:r.y1}}
+    if(shape==='bslash'){a={x:r.x0,y:r.y0};b={x:r.x1,y:r.y1}}
+    strokeSegment(a,b,state.shapeSize);return;
+  }
   const rows=shapeRows(shape,r);
   if(rows){
-    const sz=state.shapeSize,isArrow=shape==='arrowR'||shape==='arrowL'||shape==='arrowU'||shape==='arrowD';
-    const ring=isArrow?outlineRingFromRows(rows):new Set();
-    if(!isArrow)for(const {y,min,max} of rows){ring.add(idx(min,y));ring.add(idx(max,y))}
-    if(shape==='rect'){for(let x=r.x0;x<=r.x1;x++){ring.add(idx(x,r.y0));ring.add(idx(x,r.y1))}for(let y=r.y0;y<=r.y1;y++){ring.add(idx(r.x0,y));ring.add(idx(r.x1,y))}}
-    if(shape==='triangle')for(let x=r.x0;x<=r.x1;x++)ring.add(idx(x,r.y1));
+    const sz=state.shapeSize,isArrow=shape.startsWith('arrow'),ring=isArrow?outlineRingFromRows(rows):new Set();
+    const add=(x,y)=>{if(inBounds(x,y))ring.add(idx(x,y))};
+    if(!isArrow)for(const {y,min,max} of rows){add(min,y);add(max,y)}
+    if(shape==='rect'||(shape==='ellipse'&&(r.w===1||r.h===1))){for(let x=r.x0;x<=r.x1;x++){add(x,r.y0);add(x,r.y1)}for(let y=r.y0;y<=r.y1;y++){add(r.x0,y);add(r.x1,y)}}
+    if(shape==='triangle')for(let x=r.x0;x<=r.x1;x++)add(x,r.y1);
     if(state.fillMode!=='none')for(const {y,min,max} of rows)for(let x=min;x<=max;x++)strokePoint(x,y,fillGlyph(),sz);
-    if(state.outlineMode!=='none')for(const i of ring){const x=i%state.cols,y=Math.floor(i/state.cols);strokeRing(x,y,sz,ring)}
+    if(state.outlineMode!=='none')for(const i of ring)strokeRing(i%state.cols,Math.floor(i/state.cols),sz,ring);
   }else{
-    const e=shapeEdges(shape,r).e;
-    if(state.fillMode!=='none')enclosedFill(e,r);
+    const e=shapeEdges(shape,r).e;if(state.fillMode!=='none')enclosedFill(e,r);
     if(state.outlineMode!=='none')for(const [p,q] of e)strokeSegment(p,q,state.shapeSize);
   }
 }
@@ -930,61 +1045,255 @@ function clearSelectionClasses(){for(const e of state.els)e.classList.remove('se
 function renderSelection(){clearSelectionClasses();if(!state.selection)return;const s=state.selection;if(s.type==='free'){const mask=new Set(s.mask.map(([dx,dy])=>`${dx},${dy}`));for(const [dx,dy] of s.mask){const x=s.x+dx,y=s.y+dy;let edge=false;for(const [nx,ny] of [[dx+1,dy],[dx-1,dy],[dx,dy+1],[dx,dy-1]])if(!mask.has(`${nx},${ny}`)){edge=true;break}if(edge&&inBounds(x,y))state.els[idx(x,y)]?.classList.add('selected')}}else for(let y=s.y;y<s.y+s.h;y++)for(let x=s.x;x<s.x+s.w;x++){if(!inBounds(x,y))continue;if(x===s.x||x===s.x+s.w-1||y===s.y||y===s.y+s.h-1)state.els[idx(x,y)]?.classList.add('selected')}}
 function selectionBounds(){return state.selection||{x:0,y:0,w:0,h:0}}
 function selectionContains(x,y){const s=state.selection;if(!s)return false;if(x<s.x||y<s.y||x>=s.x+s.w||y>=s.y+s.h)return false;if(s.type==='free')return s.mask.some(([dx,dy])=>s.x+dx===x&&s.y+dy===y);return true}
-function selectedPositions(){const s=state.selection;if(!s)return[];if(s.type==='free')return s.mask.map(([dx,dy])=>[s.x+dx,s.y+dy]);const a=[];for(let y=s.y;y<s.y+s.h;y++)for(let x=s.x;x<s.x+s.w;x++)a.push([x,y]);return a}
-function captureSelection(){if(!state.selection)return null;const s=selectionBounds(),map=new Map(selectedPositions().map(([x,y])=>[`${x-s.x},${y-s.y}`,deepCell(getCell(x,y))]));return{w:s.w,h:s.h,map:[...map.entries()],type:state.selection.type,mask:state.selection.mask||null}}
-async function copySelection(){if(!state.selection){setMessage('Select an area first');return}state.clipboard=captureSelection();const lines=[];for(let y=0;y<state.clipboard.h;y++){let line='';for(let x=0;x<state.clipboard.w;x++){const ent=state.clipboard.map.find(([k])=>k===`${x},${y}`);line+=ent?ent[1].ch:' '}lines.push(line)}try{await navigator.clipboard.writeText(lines.join('\n'))}catch{}setMessage('Copied selection')}
-async function cutSelection(){if(!state.selection)return;await copySelection();snapshot();for(const [x,y] of selectedPositions())setCell(x,y,makeCell(' '));markDirty();setMessage('Cut selection')}
-async function pasteSelection(){let clip=state.clipboard;if(!clip){try{const t=await navigator.clipboard.readText();if(t){const lines=t.split(/\r?\n/),w=Math.max(...lines.map(l=>[...l].length));clip={w,h:lines.length,map:[]};lines.forEach((l,y)=>[...l.padEnd(w)].forEach((ch,x)=>clip.map.push([`${x},${y}`,makeCell(ch)])))}}catch{}}if(!clip){setMessage('Clipboard empty');return}snapshot();const ox=state.selection?.x||0,oy=state.selection?.y||0;for(const [k,c] of clip.map){const [dx,dy]=k.split(',').map(Number);if(state.transparentSelect&&c.ch===' ')continue;if(inBounds(ox+dx,oy+dy))setCell(ox+dx,oy+dy,c)}state.selection={type:'rect',x:ox,y:oy,w:clip.w,h:clip.h};renderSelection();markDirty();setMessage('Pasted')}
-function previewMoveSelection(p){clearPreview();const m=state.moveSelection,dx=p.x-m.start.x,dy=p.y-m.start.y,minX=m.bounds.x+dx,minY=m.bounds.y+dy,maxX=minX+m.copy.w-1,maxY=minY+m.copy.h-1;for(let x=minX;x<=maxX;x++){addPreview(x,minY);addPreview(x,maxY)}for(let y=minY;y<=maxY;y++){addPreview(minX,y);addPreview(maxX,y)}}
-function commitMoveSelection(p){clearPreview();const m=state.moveSelection,dx=p.x-m.start.x,dy=p.y-m.start.y;snapshot();for(const [x,y] of selectedPositions())setCell(x,y,makeCell(' '));for(const [k,c] of m.copy.map){const [rx,ry]=k.split(',').map(Number);if(state.transparentSelect&&c.ch===' ')continue;setCell(m.bounds.x+rx+dx,m.bounds.y+ry+dy,c)}state.selection={...state.selection,x:m.bounds.x+dx,y:m.bounds.y+dy};renderSelection();markDirty()}
-function deleteSelection(){if(!state.selection){setMessage('Select an area first');return}snapshot();for(const [x,y] of selectedPositions())setCell(x,y,makeCell(' '));markDirty();setMessage('Deleted selection')}
-function cropSelection(){if(!state.selection){setMessage('Select an area first');return}snapshot();const s=selectionBounds(),nc=[];for(let y=0;y<s.h;y++)for(let x=0;x<s.w;x++)nc.push(inBounds(s.x+x,s.y+y)?deepCell(getCell(s.x+x,s.y+y)):makeCell());state.cols=s.w;state.rows=s.h;state.cells=nc;state.selection=null;rebuildGrid();markDirty();setMessage('Cropped')}
 
-function transform(type){
-  const s=state.selection?selectionBounds():{x:0,y:0,w:state.cols,h:state.rows};
-  const src=[];for(let y=0;y<s.h;y++){const row=[];for(let x=0;x<s.w;x++)row.push(deepCell(getCell(s.x+x,s.y+y)));src.push(row)}
-  let out=src,ow=s.w,oh=s.h;
-  if(type==='flipH')out=src.map(r=>[...r].reverse());
-  else if(type==='flipV')out=[...src].reverse();
-  else if(type==='rot180')out=[...src].reverse().map(r=>[...r].reverse());
-  else if(type==='rot90'){oh=s.w;ow=s.h;out=Array.from({length:oh},(_,y)=>Array.from({length:ow},(_,x)=>src[s.h-1-x][y]));}
-  else if(type==='rot270'){oh=s.w;ow=s.h;out=Array.from({length:oh},(_,y)=>Array.from({length:ow},(_,x)=>src[x][s.w-1-y]));}
-  snapshot();
-  if(!state.selection&&(type==='rot90'||type==='rot270')){state.cols=ow;state.rows=oh;state.cells=out.flat().map(deepCell);rebuildGrid();markDirty();setMessage('Rotated');return}
-  if(state.selection&&(type==='rot90'||type==='rot270')){
-    for(let y=s.y;y<s.y+s.h;y++)for(let x=s.x;x<s.x+s.w;x++)if(inBounds(x,y))setCell(x,y,makeCell(' '));
-    for(let y=0;y<oh;y++)for(let x=0;x<ow;x++)if(inBounds(s.x+x,s.y+y))setCell(s.x+x,s.y+y,out[y][x]);
-    state.selection={type:'rect',x:s.x,y:s.y,w:Math.min(ow,state.cols-s.x),h:Math.min(oh,state.rows-s.y)};
-  }else{
-    for(let y=0;y<s.h;y++)for(let x=0;x<s.w;x++)setCell(s.x+x,s.y+y,out[y][x]);
+function clipSelection(s){
+  if(!s)return null;const x=Math.max(0,s.x),y=Math.max(0,s.y),right=Math.min(state.cols,s.x+s.w),bottom=Math.min(state.rows,s.y+s.h);
+  if(right<=x||bottom<=y)return null;
+  const clipped={type:s.type,x,y,w:right-x,h:bottom-y};
+  if(s.type==='free'){
+    clipped.mask=s.mask.map(([dx,dy])=>[s.x+dx-x,s.y+dy-y]).filter(([dx,dy])=>dx>=0&&dy>=0&&dx<clipped.w&&dy<clipped.h);
+    if(!clipped.mask.length)return null;
   }
-  renderSelection();updateStats();markDirty();setMessage(type.startsWith('rot')?'Rotated':'Flipped');
+  return clipped;
 }
+function selectedPositions(){
+  const s=state.selection;if(!s)return[];
+  if(s.type==='free')return s.mask.map(([dx,dy])=>[s.x+dx,s.y+dy]).filter(([x,y])=>inBounds(x,y));
+  const a=[];for(let y=Math.max(0,s.y);y<Math.min(state.rows,s.y+s.h);y++)for(let x=Math.max(0,s.x);x<Math.min(state.cols,s.x+s.w);x++)a.push([x,y]);return a;
+}
+function captureSelection(){
+  const s=clipSelection(state.selection);if(!s)return null;
+  const map=selectedPositions().map(([x,y])=>[`${x-s.x},${y-s.y}`,deepCell(getCell(x,y))]);
+  return{w:s.w,h:s.h,map,type:s.type,mask:s.mask||null};
+}
+function clipboardText(clip){
+  const map=new Map(clip.map),lines=[];
+  for(let y=0;y<clip.h;y++){const line=[];for(let x=0;x<clip.w;x++)line.push(map.get(`${x},${y}`)?.ch||' ');lines.push(line.join(''))}
+  return lines.join('\n');
+}
+async function writeClipboard(clip){try{await navigator.clipboard.writeText(clipboardText(clip))}catch{ /* Internal clipboard remains available offline. */ }}
+async function copySelection(){
+  const clip=captureSelection();if(!clip){setMessage('Select an area first');return}
+  state.clipboard=clip;await writeClipboard(clip);setMessage('Copied selection (internal clipboard available)');
+}
+async function cutSelection(){
+  const clip=captureSelection();if(!clip)return;const positions=selectedPositions();state.clipboard=clip;
+  // Mutate the captured region before awaiting clipboard permission; later selection changes are unrelated.
+  snapshot();for(const [x,y] of positions)setCell(x,y,makeCell(' '));markDirty();setMessage('Cut selection');await writeClipboard(clip);
+}
+async function pasteSelection(){
+  let clip=state.clipboard;const revision=documentRevision,origin={x:Math.max(0,state.selection?.x||0),y:Math.max(0,state.selection?.y||0)};
+  if(!clip){
+    try{const t=await navigator.clipboard.readText();if(t){const data=textDocument(t),map=data.cells.map((c,i)=>[`${i%data.cols},${Math.floor(i/data.cols)}`,c]);clip={w:data.cols,h:data.rows,map}}}
+    catch(err){setMessage('Clipboard read failed. Open a text file or copy a GlyphPoint selection.');return}
+    if(revision!==documentRevision){setMessage('Document changed while reading the clipboard; paste again.');return}
+  }
+  if(!clip){setMessage('Clipboard empty');return}
+  let prospective;try{prospective=includeUsedGlyphs(state.glyphPalette.map(e=>({...e})),clip.map.map(([,c])=>c))}catch(err){setMessage(err.message);return}
+  snapshot();state.glyphPalette=prospective;
+  for(const [k,c] of clip.map){const [dx,dy]=k.split(',').map(Number);if(state.transparentSelect&&c.ch===' ')continue;setCell(origin.x+dx,origin.y+dy,c)}
+  state.selection=clipSelection({type:clip.type||'rect',x:origin.x,y:origin.y,w:clip.w,h:clip.h,...(clip.type==='free'?{mask:clip.mask}: {})});
+  renderSelection();updateStats();markDirty();setMessage('Pasted (cells beyond the field are clipped)');
+}
+function previewMoveSelection(p){clearPreview();const m=state.moveSelection,dx=p.x-m.start.x,dy=p.y-m.start.y,minX=m.bounds.x+dx,minY=m.bounds.y+dy,maxX=minX+m.copy.w-1,maxY=minY+m.copy.h-1;for(let x=minX;x<=maxX;x++){addPreview(x,minY);addPreview(x,maxY)}for(let y=minY;y<=maxY;y++){addPreview(minX,y);addPreview(maxX,y)}}
 
+function commitMoveSelection(p){
+  clearPreview();const m=state.moveSelection,dx=p.x-m.start.x,dy=p.y-m.start.y;if(!dx&&!dy)return;
+  snapshot();for(const [x,y] of selectedPositions())setCell(x,y,makeCell(' '));
+  for(const [k,c] of m.copy.map){const [rx,ry]=k.split(',').map(Number);if(state.transparentSelect&&c.ch===' ')continue;setCell(m.bounds.x+rx+dx,m.bounds.y+ry+dy,c)}
+  state.selection=clipSelection({...state.selection,x:m.bounds.x+dx,y:m.bounds.y+dy});renderSelection();updateStats();markDirty();
+}
+function deleteSelection(){if(!state.selection){setMessage('Select an area first');return}snapshot();for(const [x,y] of selectedPositions())setCell(x,y,makeCell(' '));markDirty();setMessage('Deleted selection')}
+
+function cropSelection(){
+  const s=clipSelection(state.selection);if(!s){setMessage('Select an area first');return}
+  snapshot();const nc=Array.from({length:s.w*s.h},()=>makeCell());
+  for(const [x,y] of selectedPositions())nc[(y-s.y)*s.w+x-s.x]=deepCell(getCell(x,y));
+  state.cols=s.w;state.rows=s.h;state.cells=nc;state.selection=null;rebuildGrid();markDirty();setMessage('Cropped');
+}
+function transform(type){
+  if(!['flipH','flipV','rot90','rot180','rot270'].includes(type))return;
+  const selected=!!state.selection,s=selected?clipSelection(state.selection):{type:'rect',x:0,y:0,w:state.cols,h:state.rows};if(!s)return;
+  const positions=selected?selectedPositions():state.cells.map((_,i)=>[i%state.cols,Math.floor(i/state.cols)]);
+  const entries=positions.map(([x,y])=>({x:x-s.x,y:y-s.y,c:deepCell(getCell(x,y))}));
+  const quarter=type==='rot90'||type==='rot270',ow=quarter?s.h:s.w,oh=quarter?s.w:s.h;
+  const dest=(x,y)=>type==='flipH'?[s.w-1-x,y]:type==='flipV'?[x,s.h-1-y]:type==='rot180'?[s.w-1-x,s.h-1-y]:type==='rot90'?[s.h-1-y,x]:[y,s.w-1-x];
+  snapshot();
+  if(!selected){state.cols=ow;state.rows=oh;state.cells=Array.from({length:ow*oh},()=>makeCell());for(const e of entries){const [x,y]=dest(e.x,e.y);state.cells[idx(x,y)]=e.c}rebuildGrid()}
+  else{
+    for(const [x,y] of positions)setCell(x,y,makeCell());
+    const mask=[];for(const e of entries){const [x,y]=dest(e.x,e.y);setCell(s.x+x,s.y+y,e.c);mask.push([x,y])}
+    state.selection=clipSelection({type:s.type,x:s.x,y:s.y,w:ow,h:oh,...(s.type==='free'?{mask}: {})});renderSelection();
+  }
+  updateStats();markDirty();setMessage(type.startsWith('rot')?'Rotated':'Flipped');
+}
 function openResize(){const unit=$('#resizeUnit').value;state.resizeAspect=state.cols/state.rows;$('#resizeW').value=unit==='percent'?100:state.cols;$('#resizeH').value=unit==='percent'?100:state.rows;$('#skewX').value=0;$('#skewY').value=0;if(!$('#resizeDialog').open)$('#resizeDialog').showModal()}
 function syncResizeAspect(which){if(!$('#keepAspect').checked||state.aspectSync)return;state.aspectSync=true;const unit=$('#resizeUnit').value;if(unit==='percent'){if(which==='w')$('#resizeH').value=$('#resizeW').value;else $('#resizeW').value=$('#resizeH').value}else{if(which==='w')$('#resizeH').value=Math.max(1,Math.round((+$(`#resizeW`).value)/state.resizeAspect));else $('#resizeW').value=Math.max(1,Math.round((+$(`#resizeH`).value)*state.resizeAspect))}state.aspectSync=false}
-function applyResizeSkew(){snapshot();const unit=$('#resizeUnit').value;let nw=+$(`#resizeW`).value,nh=+$(`#resizeH`).value;if(unit==='percent'){nw=Math.max(1,Math.round(state.cols*nw/100));nh=Math.max(1,Math.round(state.rows*nh/100))}const old=state.cells.map(deepCell),oc=state.cols,or=state.rows;let resized=Array.from({length:nw*nh},()=>makeCell(' '));for(let y=0;y<nh;y++)for(let x=0;x<nw;x++){const sx=clamp(Math.floor(x*oc/nw),0,oc-1),sy=clamp(Math.floor(y*or/nh),0,or-1);resized[y*nw+x]=deepCell(old[sy*oc+sx])}state.cols=nw;state.rows=nh;state.cells=resized;const kx=Math.tan(($('#skewX').value||0)*Math.PI/180),ky=Math.tan(($('#skewY').value||0)*Math.PI/180);if(Math.abs(kx)>.001||Math.abs(ky)>.001){const src=state.cells.map(deepCell),out=Array.from({length:nw*nh},()=>makeCell(' '));for(let y=0;y<nh;y++)for(let x=0;x<nw;x++){const nx=Math.round(x+kx*y),ny=Math.round(y+ky*x);if(nx>=0&&ny>=0&&nx<nw&&ny<nh)out[ny*nw+nx]=deepCell(src[y*nw+x])}state.cells=out}state.selection=null;rebuildGrid();markDirty();setMessage('Resized / skewed')}
 
-function placeText(){if(!state.textAnchor)return;snapshot();const txt=$('#textValue').value,scale=+$(`#textScale`).value,font=$('#textFont').value,bold=$('#textBold').checked,italic=$('#textItalic').checked,underline=$('#textUnderline').checked,opaque=$('#textBg').value==='opaque';const lines=txt.split(/\r?\n/);for(let ly=0;ly<lines.length;ly++){const chars=[...lines[ly]];for(let cx=0;cx<chars.length;cx++)for(let sy=0;sy<scale;sy++)for(let sx=0;sx<scale;sx++){const x=state.textAnchor.x+cx*scale+sx,y=state.textAnchor.y+ly*scale+sy;if(inBounds(x,y))setCell(x,y,{ch:chars[cx],fg:'',bg:opaque?state.fieldBg||'#000000':'',font,bold,italic,underline})}}markDirty();setMessage('Text placed')}
-
+function applyResizeSkew(){
+  try{
+    const unit=$('#resizeUnit').value;let nw=Number($('#resizeW').value),nh=Number($('#resizeH').value);
+    if(!Number.isFinite(nw)||!Number.isFinite(nh)||nw<=0||nh<=0)throw Error('Enter positive dimensions or percentages.');
+    if(unit==='percent'){nw=Math.max(1,Math.round(state.cols*nw/100));nh=Math.max(1,Math.round(state.rows*nh/100))}
+    validateDimensions(nw,nh);const ax=Number($('#skewX').value),ay=Number($('#skewY').value);
+    if(!Number.isFinite(ax)||!Number.isFinite(ay)||Math.abs(ax)>89||Math.abs(ay)>89)throw Error('Skew angles must be between -89 and 89 degrees.');
+    const old=state.cells,oc=state.cols,or=state.rows;let cells=Array.from({length:nw*nh},()=>makeCell());
+    for(let y=0;y<nh;y++)for(let x=0;x<nw;x++)cells[y*nw+x]=deepCell(old[Math.floor(y*or/nh)*oc+Math.floor(x*oc/nw)]);
+    const kx=Math.tan(ax*Math.PI/180),ky=Math.tan(ay*Math.PI/180);
+    if(Math.abs(kx)>.001||Math.abs(ky)>.001){const src=cells;cells=Array.from({length:nw*nh},()=>makeCell());for(let y=0;y<nh;y++)for(let x=0;x<nw;x++){const nx=Math.round(x+kx*y),ny=Math.round(y+ky*x);if(nx>=0&&ny>=0&&nx<nw&&ny<nh)cells[ny*nw+nx]=deepCell(src[y*nw+x])}}
+    snapshot();state.cols=nw;state.rows=nh;state.cells=cells;state.selection=null;rebuildGrid();markDirty();setMessage('Resized / skewed; cells outside the field are clipped');return true;
+  }catch(err){alert(err.message);return false}
+}
+function placeText(){
+  if(!state.textAnchor)return false;
+  try{
+    const text=$('#textValue').value;if(!text)return true;
+    const data=textDocument(text),scale=clamp(Number($('#textScale').value)||1,1,3),font=normaliseFont($('#textFont').value),bold=$('#textBold').checked,italic=$('#textItalic').checked,underline=$('#textUnderline').checked,opaque=$('#textBg').value==='opaque';
+    const glyphs=data.cells.filter(c=>opaque||c.ch!==' ');includeUsedGlyphs(state.glyphPalette.map(e=>({...e})),glyphs);snapshot();
+    for(let ly=0;ly<data.rows;ly++)for(let cx=0;cx<data.cols;cx++){
+      const ch=data.cells[ly*data.cols+cx].ch;if(!opaque&&ch===' ')continue;
+      for(let sy=0;sy<scale;sy++)for(let sx=0;sx<scale;sx++)setCell(state.textAnchor.x+cx*scale+sx,state.textAnchor.y+ly*scale+sy,{ch,fg:'',bg:opaque?state.fieldBg:'',font,bold,italic,underline});
+    }
+    markDirty();setMessage('Text placed');return true;
+  }catch(err){alert(err.message);return false}
+}
 function setZoom(z){state.zoom=clamp(Math.round(z*4)/4,.25,8);$('#canvasWrap').style.transform=`scale(${state.zoom})`;$('#canvasWrap').style.marginRight=`${(state.zoom-1)*$('#canvasGrid').offsetWidth}px`;$('#canvasWrap').style.marginBottom=`${(state.zoom-1)*$('#canvasGrid').offsetHeight}px`;$('#zoomSlider').value=Math.round(state.zoom*100);$('#zoomLabel').textContent=Math.round(state.zoom*100)+'%';renderRulers()}
-function renderRulers(){const h=$('#hruler'),v=$('#vruler'),cell=state.els[0];if(!h||!v||!cell)return;const r=cell.getBoundingClientRect(),cw=r.width,ch=r.height;h.replaceChildren();v.replaceChildren();for(let x=0;x<state.cols;x+=5){const span=document.createElement('span');span.textContent=x;span.style.cssText=`display:inline-block;width:${Math.min(5,state.cols-x)*cw}px`;h.appendChild(span)}for(let y=0;y<state.rows;y+=5){const div=document.createElement('div');div.textContent=y;div.style.height=`${Math.min(5,state.rows-y)*ch}px`;v.appendChild(div)}}
 
+function renderRulers(){
+  const h=$('#hruler'),v=$('#vruler'),cell=state.els[0],scroller=$('#scroller');if(!h||!v||!cell)return;
+  const r=cell.getBoundingClientRect(),cw=r.width,ch=r.height;h.replaceChildren();v.replaceChildren();
+  if(typeof getComputedStyle==='function'){const css=getComputedStyle(scroller);h.style.paddingLeft=css.paddingLeft;v.style.paddingTop=css.paddingTop}
+  for(let x=0;x<state.cols;x+=5){const span=document.createElement('span');span.textContent=x;span.style.cssText=`display:inline-block;width:${Math.min(5,state.cols-x)*cw}px`;h.appendChild(span)}
+  for(let y=0;y<state.rows;y+=5){const div=document.createElement('div');div.textContent=y;div.style.height=`${Math.min(5,state.rows-y)*ch}px`;v.appendChild(div)}
+  h.scrollLeft=scroller.scrollLeft;v.scrollTop=scroller.scrollTop;
+}
 function handleFile(a){$('#fileMenu').classList.remove('open');if(a==='new'){if(!state.dirty||confirm('Discard current document?'))newDocument(80,80,true)}else if(a==='openProject')$('#openProjectInput').click();else if(a==='openTxt')$('#openTxtInput').click();else if(a==='openHtml')$('#openHtmlInput').click();else if(a==='saveProject')saveProject();else if(a==='exportTxt')downloadBlob(cellsToText(),'text/plain','glyphpoint.txt');else if(a==='exportHtml')exportHtml();else if(a==='properties')openProperties();else if(a==='colourManager')openGlyphColourManager();else if(a==='print')window.print();else if(a==='help')openHelp()}
 function cellsToText(){let out=[];for(let y=0;y<state.rows;y++){let s='';for(let x=0;x<state.cols;x++)s+=getCell(x,y).ch;out.push(s)}return out.join('\n')+'\n'}
-function saveProject(){const payload={format:'glyphpoint-v2',cols:state.cols,rows:state.rows,cells:state.cells,glyphPalette:state.glyphPalette,glyphPrimary:state.glyphPrimary,glyphSecondary:state.glyphSecondary,square:state.square,fieldBg:state.fieldBg};downloadBlob(JSON.stringify(payload,null,2),'application/json','glyphpoint-project.json');state.dirty=false;updateTitle();setMessage('Project saved')}
-function openProjectFile(e){const f=e.target.files[0];if(!f)return;f.text().then(t=>{const d=JSON.parse(t);if(!['glyphpoint-v1','glyphpoint-v2'].includes(d.format)||!Array.isArray(d.cells))throw Error('Not a GlyphPoint project');snapshot();state.cols=d.cols;state.rows=d.rows;state.cells=d.cells.map(c=>({...makeCell(),...c}));if(d.glyphPalette)state.glyphPalette=normalisePalette(d.glyphPalette,d.glyphColours||{});if(d.glyphPrimary)state.glyphPrimary=d.glyphPrimary;if(d.glyphSecondary)state.glyphSecondary=d.glyphSecondary;if(typeof d.square==='boolean')state.square=d.square;$('#squareToggle').setAttribute('aria-pressed',state.square);state.fieldBg=d.fieldBg||d.defaultBg||'#000000';if($('#fieldBgInput'))$('#fieldBgInput').value=state.fieldBg;state.docName=f.name;state.selection=null;rebuildGrid();buildGlyphPalette();state.dirty=false;updateTitle();setMessage('Project opened')}).catch(err=>alert(err.message));e.target.value=''}
-function openTxtFile(e){const f=e.target.files[0];if(!f)return;f.text().then(t=>{const lines=t.split(/\r?\n/);while(lines.length&&!lines[lines.length-1])lines.pop();if(!lines.length)throw Error('File is empty');const w=Math.max(...lines.map(l=>[...l].length));snapshot();state.cols=w;state.rows=lines.length;state.cells=[];for(let y=0;y<lines.length;y++){const chars=[...lines[y].padEnd(w)];for(let x=0;x<w;x++){state.cells.push(makeCell(chars[x]||' '))}}state.docName=f.name;state.selection=null;rebuildGrid();buildGlyphColourPanel();state.dirty=false;updateTitle();setMessage('Plain text imported')}).catch(err=>alert(err.message));e.target.value=''}
-async function openHtmlFile(e){const f=e.target.files[0];if(!f)return;try{const t=await f.text(),doc=new DOMParser().parseFromString(t,'text/html'),pre=doc.querySelector('#art')||doc.querySelector('pre');if(!pre)throw Error('No <pre id="art"> found');const rows=[];let cur=[];const walk=node=>{if(node.nodeType===3){for(const ch of node.nodeValue){if(ch==='\n'){rows.push(cur);cur=[]}else{cur.push(makeCell(ch))}}}else if(node.nodeType===1){node.childNodes.forEach(walk)}};walk(pre);if(cur.length)rows.push(cur);while(rows.length&&rows.at(-1).length===0)rows.pop();if(!rows.length)throw Error('Artwork is empty');const w=Math.max(...rows.map(r=>r.length));snapshot();state.cols=w;state.rows=rows.length;state.cells=[];for(const r of rows){for(let x=0;x<w;x++)state.cells.push(r[x]||makeCell(' '))}state.docName=f.name;state.selection=null;rebuildGrid();buildGlyphColourPanel();state.dirty=false;updateTitle();setMessage('HTML imported')}catch(err){alert('Could not import HTML: '+err.message)}e.target.value=''}
-function exportHtml(){const lines=[];for(let y=0;y<state.rows;y++){let out='',run=null,buf='';const flush=()=>{if(!buf)return;const resolved=resolveGlyphColour(run.ch);out+=`<span style="color:${resolved.fg};background-color:${resolved.bg};font-family:${JSON.stringify(run.font)};font-weight:${run.bold?700:400};font-style:${run.italic?'italic':'normal'};text-decoration:${run.underline?'underline':'none'}">${escapeHtml(buf)}</span>`;buf=''};for(let x=0;x<state.cols;x++){const c=getCell(x,y);if(!run||run.ch!==c.ch){run={ch:c.ch,font:c.font,bold:c.bold,italic:c.italic,underline:c.underline};buf=''}buf+=c.ch}flush();lines.push(out)}const html=`<!doctype html><html><head><meta charset="utf-8"><title>GlyphPoint export</title><style>html,body{margin:0;background:#000;color:#fff}body{display:grid;place-items:center;min-height:100vh;padding:20px}pre{margin:0;font:700 10px/8px "Cascadia Mono",Consolas,monospace;white-space:pre;font-variant-ligatures:none;letter-spacing:0}span{text-shadow:0 0 2.6px currentColor}</style></head><body><pre id="art">${lines.join('\n')}</pre></body></html>`;downloadBlob(html,'text/html','glyphpoint-export.html');setMessage('HTML exported')}
-function escapeHtml(s){return s.replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]))}
+
+function projectPayload(){return{format:'glyphpoint-v2',cols:state.cols,rows:state.rows,cells:state.cells,glyphPalette:state.glyphPalette,glyphPrimary:state.glyphPrimary,glyphSecondary:state.glyphSecondary,square:state.square,fieldBg:state.fieldBg}}
+function normaliseProject(d){
+  if(!d||!['glyphpoint-v1','glyphpoint-v2'].includes(d.format)||d.kind==='palette'||!Array.isArray(d.cells))throw Error('Not a GlyphPoint project');
+  validateDimensions(d.cols,d.rows);if(d.cells.length!==d.cols*d.rows)throw Error('Cell count does not match the declared dimensions.');
+  const cells=d.cells.map(normaliseCell),pal=includeUsedGlyphs(normalisePalette(d.glyphPalette??DEFAULT_GLYPH_PALETTE,d.glyphColours||{}),cells);
+  const fieldBg=d.fieldBg??d.defaultBg??'#000000';if(!validColour(fieldBg))throw Error('Field background must be a six-digit hex colour.');
+  if(d.square!==undefined&&typeof d.square!=='boolean')throw Error('Square pixels must be true or false.');
+  return{cols:d.cols,rows:d.rows,cells,glyphPalette:pal,fieldBg:fieldBg.toLowerCase(),square:d.square===true,
+    glyphPrimary:pal.some(e=>e.glyph===d.glyphPrimary)?d.glyphPrimary:pal[0].glyph,
+    glyphSecondary:pal.some(e=>e.glyph===d.glyphSecondary)?d.glyphSecondary:(pal[1]||pal[0]).glyph};
+}
+function saveProject(){
+  try{normaliseProject(projectPayload());downloadBlob(JSON.stringify(projectPayload(),null,2),'application/json','glyphpoint-project.json');state.dirty=false;updateTitle();setMessage('Project download requested; keep the downloaded JSON file.')}catch(err){alert('Could not save project: '+err.message)}
+}
+async function readImportFile(f){if(f.size>MAX_FILE_BYTES)throw Error('File exceeds the 16 MiB import limit.');return await f.text()}
+function textDocument(text){
+  text=String(text).replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n');if(text.endsWith('\n'))text=text.slice(0,-1);
+  if(!text.length)throw Error('Text is empty.');const lines=text.split('\n');if(lines.length>MAX_DIMENSION)throw Error('Text has too many rows.');
+  let cols=1;const rows=lines.map(line=>{
+    const chars=[];for(const ch of line){if(ch==='\t'){do{chars.push(' ')}while(chars.length%4)}else{if(!validGlyph(ch))throw Error('Text contains an unsupported control character.');chars.push(ch)}if(chars.length>MAX_DIMENSION)throw Error('Text has too many columns.')}
+    cols=Math.max(cols,chars.length);return chars;
+  });validateDimensions(cols,rows.length);
+  return{cols,rows:rows.length,cells:rows.flatMap(chars=>Array.from({length:cols},(_,x)=>makeCell(chars[x]??' ')))};
+}
+function installDocument(data,name){
+  snapshot();for(const key of ['cols','rows','cells','glyphPalette','glyphPrimary','glyphSecondary','fieldBg','square'])state[key]=data[key];
+  state.docName=name;state.selection=null;state.drawing=false;state.moveSelection=null;state.drawGlyph=state.glyphPrimary;state.textAnchor=null;clearPreview();
+  syncDocumentControls();rebuildGrid();savePalettePrefs();state.dirty=false;documentRevision++;updateTitle();
+}
+async function importDocumentFile(e,parse,label){
+  const f=e.target.files[0];if(!f)return;e.target.value='';const generation=++importGeneration;
+  try{
+    const data=await parse(await readImportFile(f));if(generation!==importGeneration)return;
+    if(state.dirty&&!confirm('Discard unsaved changes and open this file?'))return;
+    installDocument(data,f.name);if(label!=='Project opened')markDirty();setMessage(label+(data.importWarning?' — '+data.importWarning:''));
+  }catch(err){if(generation===importGeneration)alert('Could not open file: '+err.message)}
+}
+function openProjectFile(e){return importDocumentFile(e,t=>normaliseProject(JSON.parse(t)),'Project opened')}
+function openTxtFile(e){return importDocumentFile(e,t=>normaliseProject({format:'glyphpoint-v2',...textDocument(t),glyphPalette:state.glyphPalette,fieldBg:state.fieldBg,square:state.square,glyphPrimary:state.glyphPrimary,glyphSecondary:state.glyphSecondary}),'Plain text imported')}
+function inlineColour(value){
+  if(validColour(value))return value.toLowerCase();let m=/^#([0-9a-f]{3})$/i.exec(value||'');if(m)return '#'+[...m[1]].map(c=>c+c).join('').toLowerCase();
+  m=/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i.exec(value||'');
+  if(m&&m.slice(1).every(v=>Number(v)<=255))return '#'+m.slice(1).map(v=>Number(v).toString(16).padStart(2,'0')).join('');return null;
+}
+function htmlDocument(text){
+  // Template contents are inert and never inserted: scripts, resources and event attributes stay inactive.
+  const template=document.createElement('template');template.innerHTML=text;const doc=template.content;
+  const data=doc.querySelector('script#glyphpoint-data[type="application/json"]');if(data)return normaliseProject(JSON.parse(data.textContent));
+  const pre=doc.querySelector('#art')||doc.querySelector('pre');if(!pre)throw Error('No <pre> artwork found.');
+  const rows=[[]],palette=[],colours=new Map();let conflicts=0;
+  const put=(ch,style)=>{
+    if(ch==='\n'){rows.push([]);if(rows.length>MAX_DIMENSION+1)throw Error('HTML has too many rows.');return}
+    const row=rows[rows.length-1];if(ch==='\t'){do{put(' ',style)}while(row.length%4);return}
+    if(!validGlyph(ch))throw Error('HTML contains an unsupported control character.');if(row.length>=MAX_DIMENSION)throw Error('HTML has too many columns.');
+    row.push({...makeCell(ch),...style});
+    if(!colours.has(ch)){if(palette.length>=MAX_PALETTE)throw Error('HTML has too many glyphs.');colours.set(ch,style.fg);palette.push({glyph:ch,colour:style.fg,represents:''})}
+    else if(colours.get(ch)!==style.fg&&!isWhitespaceGlyph(ch))conflicts++;
+  };
+  const walk=(node,inherited,depth=0)=>{
+    if(depth>100)throw Error('HTML nesting is too deep.');
+    if(node.nodeType===3){for(const ch of node.nodeValue.replace(/\r\n?/g,'\n'))put(ch,inherited);return}
+    if(node.nodeType!==1||['SCRIPT','STYLE','TEMPLATE','NOSCRIPT','IFRAME','OBJECT','SVG','MATH'].includes(node.tagName))return;
+    if(node.tagName==='BR'){put('\n',inherited);return}
+    const css=node.style,style={...inherited},font=css?.fontFamily?.split(',')[0].trim().replace(/^["']|["']$/g,'');
+    if(font)style.font=normaliseFont(font);const colour=inlineColour(css?.color);if(colour)style.fg=colour;
+    if(css?.fontWeight)style.bold=css.fontWeight==='bold'||Number(css.fontWeight)>=600;
+    if(css?.fontStyle)style.italic=css.fontStyle==='italic';if(css?.textDecoration)style.underline=css.textDecoration.includes('underline');
+    if(['B','STRONG'].includes(node.tagName))style.bold=true;if(['I','EM'].includes(node.tagName))style.italic=true;if(node.tagName==='U')style.underline=true;
+    for(const child of node.childNodes)walk(child,style,depth+1);
+  };
+  walk(pre,{fg:'#ffffff',font:'Cascadia Mono',bold:false,italic:false,underline:false});
+  if(!rows.at(-1).length)rows.pop();if(!rows.length)throw Error('Artwork is empty.');let cols=1;for(const row of rows)cols=Math.max(cols,row.length);validateDimensions(cols,rows.length);
+  const result=normaliseProject({format:'glyphpoint-v2',cols,rows:rows.length,cells:rows.flatMap(row=>Array.from({length:cols},(_,x)=>row[x]||makeCell())),glyphPalette:palette,fieldBg:inlineColour(pre.style.backgroundColor)||'#000000',square:false});
+  if(conflicts)result.importWarning=`${conflicts} cells had conflicting glyph colours; the first colour for each glyph was retained`;
+  return result;
+}
+function openHtmlFile(e){return importDocumentFile(e,htmlDocument,'HTML imported')}
+function exportHtml(){
+  try{
+    const data=normaliseProject(projectPayload()),glyphIndex=new Map(data.glyphPalette.map((e,i)=>[e.glyph,i]));
+    const paletteCss=data.glyphPalette.map((e,i)=>`.g${i}{color:${isWhitespaceGlyph(e.glyph)?data.fieldBg:e.colour}}`).join('');
+    const fontCss=SAFE_FONTS.map((font,i)=>`.f${i}{font-family:${JSON.stringify(font)},monospace}`).join('');
+    const lines=[];for(let y=0;y<data.rows;y++){
+      const row=[];for(let x=0;x<data.cols;x++){const c=data.cells[y*data.cols+x];row.push(`<span class="g${glyphIndex.get(c.ch)} f${SAFE_FONTS.indexOf(c.font)}${c.bold?' b':''}${c.italic?' i':''}${c.underline?' u':''}">${escapeHtml(c.ch)}</span>`)}lines.push(row.join(''));
+    }
+    const json=JSON.stringify({...data,format:'glyphpoint-v2'}).replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/&/g,'\\u0026');
+    const html=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>GlyphPoint export</title><style>html,body{margin:0;background:${data.fieldBg};color:#fff}body{padding:20px}pre{display:grid;grid-template-columns:repeat(${data.cols},${data.square?'1em':'1ch'});width:max-content;margin:0;font:12px/1em "Cascadia Mono",Consolas,monospace;white-space:pre;font-variant-ligatures:none}pre>span{display:block;height:1em;overflow:hidden;text-align:center}.b{font-weight:bold}.i{font-style:italic}.u{text-decoration:underline}${paletteCss}${fontCss}</style></head><body><pre id="art">${lines.join('\n')}</pre><script id="glyphpoint-data" type="application/json">${json}<\/script></body></html>`;
+    if(new Blob([html]).size>MAX_FILE_BYTES)throw Error('HTML exceeds the import budget; save the project JSON or use a smaller field.');
+    downloadBlob(html,'text/html','glyphpoint-export.html');setMessage('HTML exported with editable project data');
+  }catch(err){alert('Could not export HTML: '+err.message)}
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function downloadBlob(data,type,name){const blob=data instanceof Blob?data:new Blob([data],{type}),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),2000)}
 function openProperties(){const d=$('#propertiesDialog');$('#propW').value=state.cols;$('#propH').value=state.rows;$('#propBg').value=state.fieldBg;$('#transparentSelect').checked=state.transparentSelect;d.showModal()}
-function applyProperties(){const w=+$(`#propW`).value,h=+$(`#propH`).value;state.fieldBg=$('#propBg').value;if($('#fieldBgInput'))$('#fieldBgInput').value=state.fieldBg;state.transparentSelect=$('#transparentSelect').checked;$('#transparentRibbon').checked=state.transparentSelect;renderAll();if(w!==state.cols||h!==state.rows){snapshot();const old=state.cells,oc=state.cols,or=state.rows;state.cols=w;state.rows=h;state.cells=Array.from({length:w*h},(_,i)=>{const [x,y]=[i%w,Math.floor(i/w)];return x<oc&&y<or?deepCell(old[y*oc+x]):makeCell(' ')});state.selection=null;rebuildGrid();markDirty()}$('#propertiesDialog').close()}
+
+function applyProperties(){
+  try{
+    const w=Number($('#propW').value),h=Number($('#propH').value);validateDimensions(w,h);
+    const bg=$('#propBg').value;if(!validColour(bg))throw Error('Choose a valid field background.');snapshot();
+    const old=state.cells,oc=state.cols,or=state.rows;state.cols=w;state.rows=h;state.fieldBg=bg;state.transparentSelect=$('#transparentSelect').checked;
+    state.cells=Array.from({length:w*h},(_,i)=>{const x=i%w,y=Math.floor(i/w);return x<oc&&y<or?deepCell(old[y*oc+x]):makeCell()});
+    state.selection=null;syncDocumentControls();rebuildGrid();markDirty();return true;
+  }catch(err){alert(err.message);return false}
+}
 function openHelp(){const h=$('#helpBody');h.innerHTML=`<p><b>Tools</b><br>Pencil, fill, text, eraser, glyph picker, magnifier, rectangular/free-form selection, crop, resize/skew, rotate/flip and scalable shapes.</p><p><b>Brushes</b><br>Brush size applies to Pencil and Eraser. Tip presets include circle, square, and fixed 1:3, 3:1, 1:5 and 5:1 rectangular brushes. The ratio presets scale with brush size and are brushes, not draggable shapes.</p><p><b>Glyph palette</b><br>Two glyph slots: <b>1</b> (primary) is used by the left mouse button, <b>2</b> (secondary) by the right mouse button. Click <b>Edit</b> to replace, add or remove palette entries. Palette changes are stored locally in this browser and survive reloads; <b>Reset</b> restores the defaults.</p><p><b>Clipboard</b><br><span class="kbd">Ctrl+C</span> copy &nbsp; <span class="kbd">Ctrl+X</span> cut &nbsp; <span class="kbd">Ctrl+V</span> paste &nbsp; <span class="kbd">Delete</span> clear selection.</p><p><b>History</b><br><span class="kbd">Ctrl+Z</span> undo &nbsp; <span class="kbd">Ctrl+Y</span> redo.</p><p><b>Files</b><br>The File button in the title bar opens/saves GlyphPoint JSON, imports/exports plain text or coloured HTML, and provides properties, print and help.</p><p><b>Shapes</b><br>Stroke styles: <b>Glyph</b>, <b>Lines</b> (box-drawing), or <b>None</b>. Fills use the selected fill glyph. Arrows scale their head to the shorter side and stretch their tail. Hold <span class="kbd">Shift</span> to lock shapes and lines to 1:1.</p><p><b>View</b><br>View controls are always present in both interfaces: zoom, gridlines, rulers, status bar, square cells, field background and full screen.</p><p><b>Interfaces</b><br>The title-bar mode button switches between the compact ribbon and Win98-style side panel. Both operate the same document state and tools.</p>`;$('#helpDialog').showModal()}
 
 
-function keyboard(e){const mod=e.ctrlKey||e.metaKey;if(mod&&e.key.toLowerCase()==='z'){e.preventDefault();undo()}else if(mod&&e.key.toLowerCase()==='y'){e.preventDefault();redo()}else if(mod&&e.key.toLowerCase()==='c'){e.preventDefault();copySelection()}else if(mod&&e.key.toLowerCase()==='x'){e.preventDefault();cutSelection()}else if(mod&&e.key.toLowerCase()==='v'){e.preventDefault();pasteSelection()}else if(mod&&e.key.toLowerCase()==='n'){e.preventDefault();handleFile('new')}else if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();saveProject()}else if(mod&&e.key.toLowerCase()==='p'){e.preventDefault();window.print()}else if(e.key==='Delete'&&state.selection){deleteSelection()}else if(e.key==='Escape'){closeColourPicker()}else if(e.key==='+'||e.key==='='){setZoom(state.zoom+.25)}else if(e.key==='-'){setZoom(state.zoom-.25)}}
+
+function keyboard(e){
+  const target=e.target;if(e.defaultPrevented||e.isComposing||target?.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"])')||document.querySelector('dialog[open]'))return;
+  const mod=e.ctrlKey||e.metaKey,key=e.key.toLowerCase();
+  if(mod&&key==='z'){e.preventDefault();e.shiftKey?redo():undo()}
+  else if(mod&&key==='y'){e.preventDefault();redo()}
+  else if(mod&&key==='c'){e.preventDefault();copySelection()}
+  else if(mod&&key==='x'){e.preventDefault();cutSelection()}
+  else if(mod&&key==='v'){e.preventDefault();pasteSelection()}
+  else if(mod&&key==='n'){e.preventDefault();handleFile('new')}
+  else if(mod&&key==='s'){e.preventDefault();saveProject()}
+  else if(mod&&key==='p'){e.preventDefault();window.print()}
+  else if(!mod&&!e.altKey&&e.key==='Delete'&&state.selection){e.preventDefault();deleteSelection()}
+  else if(e.key==='Escape'){closeColourPicker();closeGcmMenus();$('#fileMenu').classList.remove('open');state.drawing=false;state.moveSelection=null;clearPreview();state.selection=null;renderSelection();updateStats()}
+  else if(!mod&&!e.altKey&&(e.key==='+'||e.key==='=')){e.preventDefault();setZoom(state.zoom+.25)}
+  else if(!mod&&!e.altKey&&e.key==='-'){e.preventDefault();setZoom(state.zoom-.25)}
+}
 
 init();
 </script>

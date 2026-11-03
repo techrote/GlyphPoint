@@ -1,8 +1,9 @@
 'use strict';
 
 // Real-browser regression tests for the shipped, standalone HTML editor.
-// Usage: node tests/browser.cjs [chromium|firefox ...]
-// Requires: npm ci && npx playwright install chromium firefox
+// Usage: node tests/browser.cjs [chromium|firefox|webkit ...]
+// GP_RUN_SMOKE=1 selects the platform smoke workflows used on Windows/macOS.
+// Requires: npm ci && npx playwright install chromium firefox webkit
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
@@ -13,6 +14,11 @@ const appPath = path.resolve(process.env.GLYPHPOINT_APP || path.join(__dirname, 
 const appURL = pathToFileURL(appPath).href;
 const requestedBrowsers = process.argv.slice(2);
 const browserNames = requestedBrowsers.length ? requestedBrowsers : ['chromium', 'firefox'];
+const smoke = process.env.GP_RUN_SMOKE === '1';
+const smokeScenarios = new Set(['startup and both UI layouts', 'JSON open/save preserves document and Unicode',
+  'real pointer strokes use both glyph slots and stop after cancellation', 'keyboard grid navigation, selection and readable text',
+  'palette buttons retain keyboard focus and support semantic activation',
+  'cell colours and full-field PNG survive save and undo', 'mobile viewport supports touch secondary drawing and panning']);
 const cell = (ch, options = {}) => ({ch, fg:'', bg:'', font:'Cascadia Mono', bold:false, italic:false, underline:false, ...options});
 const fixture = () => ({
   format:'glyphpoint-v2', cols:4, rows:2, square:true, fieldBg:'#102030',
@@ -27,16 +33,63 @@ async function importFile(page, selector, payload) {
   const expectedName = payload.name;
   await page.locator(selector).setInputFiles(payload);
   await page.waitForFunction(name => document.querySelector('#docTitle').textContent.includes(name), expectedName);
+  await page.evaluate(()=>renderer.whenIdle());
 }
-async function download(page, action) {
+async function downloadBytes(page, action) {
   await page.locator('#fileBtn').click();
   const pending = page.waitForEvent('download');
   await page.locator(`#fileMenu [data-file="${action}"]`).click();
   const result = await pending;
   assert.equal(await result.failure(), null, 'Browser accepted the download');
-  return fs.readFile(await result.path(), 'utf8');
+  return fs.readFile(await result.path());
 }
-async function save(page) { return JSON.parse(await download(page, 'saveProject')); }
+async function download(page, action) { return (await downloadBytes(page, action)).toString('utf8'); }
+async function save(page) { return JSON.parse(await download(page, 'downloadProject')); }
+async function cellCentre(page,x,y) {
+  return page.evaluate(async ({x,y})=>{
+    renderer.ensureCellVisible(x,y);await renderer.whenIdle();
+    const m=renderer.metrics(),r=document.querySelector('#canvasGrid').getBoundingClientRect();
+    return {x:r.left+m.originX+(x+.5)*m.scaledCellWidth,y:r.top+m.originY+(y+.5)*m.scaledCellHeight};
+  },{x,y});
+}
+async function clickCell(page,x,y,options) { const p=await cellCentre(page,x,y);await page.mouse.click(p.x,p.y,options); }
+async function backgroundPixel(page,x,y) {
+  return page.evaluate(async ({x,y})=>{
+    renderer.ensureCellVisible(x,y);await renderer.whenIdle();const m=renderer.metrics();
+    const data=document.querySelector('#canvasGrid').getContext('2d').getImageData(
+      Math.floor((m.originX+x*m.scaledCellWidth+.5)*m.dpr),Math.floor((m.originY+y*m.scaledCellHeight+.5)*m.dpr),1,1).data;
+    return Array.from(data);
+  },{x,y});
+}
+async function assertMobileLayout(page,label) {
+  const layout=await page.evaluate(()=>{
+    const viewport={width:innerWidth,height:innerHeight},toolbar=document.querySelector('.ribbonwrap').getBoundingClientRect();
+    const box=el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}};
+    const status=[document.querySelector('#statusbar'),...document.querySelector('#statusbar').children].filter(el=>el.getClientRects().length).map(el=>({name:el.id||el.className,...box(el)}));
+    const targets=[];
+    for(const el of document.querySelectorAll('.toolbtn,.gp-btn,.shape,.bsbtn,.xformbtn')){
+      const r=box(el),parent=el.closest('.toolgrid,.gp-grid,.shapegrid,.brushshape,.transformgrid'),clip=parent?.classList.contains('gp-grid')?box(parent):toolbar;
+      const x=(r.left+r.right)/2,y=(r.top+r.bottom)/2;
+      if(x<Math.max(0,toolbar.left,clip.left)||x>Math.min(innerWidth,toolbar.right,clip.right))continue;
+      if(parent?.classList.contains('gp-grid')&&(y<clip.top||y>clip.bottom))continue;
+      targets.push({name:el.id||el.getAttribute('data-tool')||el.getAttribute('data-g')||el.getAttribute('data-shape')||el.className,
+        group:parent?.id||parent?.className||'',...r});
+    }
+    return {viewport,toolbar:{top:toolbar.top,bottom:toolbar.bottom},status,targets};
+  });
+  for(const item of layout.status){
+    assert.ok(item.left>=-.5&&item.right<=layout.viewport.width+.5&&item.top>=-.5&&item.bottom<=layout.viewport.height+.5,`${label}: ${item.name} stays within the mobile viewport (${JSON.stringify(item)})`);
+  }
+  for(const target of layout.targets){
+    assert.ok(target.width>=43.5&&target.height>=43.5,`${label}: ${target.name} has an actual 44-pixel target (${target.width}×${target.height})`);
+    assert.ok(target.top>=layout.toolbar.top-.5&&target.bottom<=layout.toolbar.bottom+.5,`${label}: ${target.name} is not vertically clipped by the toolbar`);
+  }
+  for(let i=0;i<layout.targets.length;i++)for(let j=i+1;j<layout.targets.length;j++){
+    const a=layout.targets[i],b=layout.targets[j];if(a.group!==b.group)continue;
+    const width=Math.min(a.right,b.right)-Math.max(a.left,b.left),height=Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top);
+    assert.ok(width<=.5||height<=.5,`${label}: touch targets ${a.name} and ${b.name} do not overlap`);
+  }
+}
 function projectValues(project) {
   return {cols:project.cols,rows:project.rows,cells:project.cells,glyphPalette:project.glyphPalette,glyphPrimary:project.glyphPrimary,glyphSecondary:project.glyphSecondary,square:project.square,fieldBg:project.fieldBg};
 }
@@ -54,11 +107,12 @@ async function rejectedImport(page, payload) {
 }
 
 async function runBrowser(browserName) {
-  assert.ok(['chromium','firefox'].includes(browserName), `Unsupported test browser: ${browserName}`);
+  assert.ok(['chromium','firefox','webkit'].includes(browserName), `Unsupported test browser: ${browserName}`);
   const browser = await playwright[browserName].launch({headless:true,timeout:30000});
   let completed = 0;
-  async function scenario(name, run) {
-    const context = await browser.newContext({acceptDownloads:true, viewport:{width:1440,height:1000}});
+  async function scenario(name, run, options={}) {
+    if(smoke&&!smokeScenarios.has(name))return;
+    const context = await browser.newContext({acceptDownloads:true, viewport:{width:1440,height:1000},...options});
     const page = await context.newPage();
     const errors = [], dialogs = [], externalRequests = [];
     page.on('pageerror', error=>errors.push(error.message));
@@ -66,7 +120,8 @@ async function runBrowser(browserName) {
     await context.route(/^https?:/, route=>{externalRequests.push(route.request().url());return route.abort();});
     try {
       await page.goto(appURL);
-      await page.waitForSelector('#canvasGrid .cell');
+      await page.waitForFunction(()=>typeof renderer!=='undefined'&&renderer&&state.cells.length===6400);
+      await page.evaluate(()=>renderer.whenIdle());
       await run({page,context,errors,dialogs,externalRequests});
       assert.deepEqual(errors, [], 'No uncaught JavaScript errors');
       assert.deepEqual(externalRequests, [], 'Standalone editor/import did not request external resources');
@@ -76,7 +131,10 @@ async function runBrowser(browserName) {
   }
   try {
     await scenario('startup and both UI layouts', async ({page})=>{
-      assert.equal(await page.locator('#canvasGrid .cell').count(), 6400);
+      assert.equal(await page.locator('#canvasGrid .cell').count(), 0,'There are no per-cell DOM elements');
+      assert.equal(await page.locator('#canvasGrid').evaluate(el=>el.tagName),'CANVAS');
+      assert.equal((await documentState(page)).cells.length,6400);
+      assert.equal(await page.locator('#canvasWrap').getAttribute('aria-rowcount'),'80');
       await page.setViewportSize({width:1440,height:720});
       await page.locator('#uiModeToggle').click();
       assert.equal(await page.locator('#app').evaluate(el=>el.classList.contains('classic')), true);
@@ -93,11 +151,11 @@ async function runBrowser(browserName) {
       const original = fixture();
       await importFile(page, '#openProjectInput', jsonPayload('roundtrip.json', original));
       assert.deepEqual(projectValues(await save(page)), projectValues(original));
-      assert.equal(await page.locator('#canvasGrid .cell').count(), 8);
+      assert.equal((await documentState(page)).cells.length,8);
       assert.equal(await page.locator('#fieldBgInput').inputValue(), '#102030');
       assert.equal(await page.locator('#squareToggle').getAttribute('aria-pressed'), 'true');
-      const styled = page.locator('#canvasGrid .cell').nth(1);
-      assert.equal(await styled.evaluate(el=>getComputedStyle(el).fontStyle), 'italic');
+      assert.equal((await documentState(page)).cells[1].italic,true);
+      assert.deepEqual(await backgroundPixel(page,0,0),[16,32,48,255]);
     });
     await scenario('malformed and oversized JSON rejected atomically', async ({page})=>{
       await importFile(page, '#openProjectInput', jsonPayload('original.json', fixture()));
@@ -183,11 +241,54 @@ async function runBrowser(browserName) {
       const row=page.locator('.gcm-row').filter({has:page.locator('input.gcm-glyph')}).first();
       await row.locator('input.gcm-glyph').fill('Q');
       await row.locator('input.gcm-glyph').press('Tab');
-      assert.equal(await page.locator('#canvasGrid .cell').first().textContent(),'Q');
+      assert.equal((await documentState(page)).cells[0].ch,'Q');
       await page.locator('#gcmRevert').click();
-      assert.equal(await page.locator('#canvasGrid .cell').first().textContent(),'A');
+      assert.equal((await documentState(page)).cells[0].ch,'A');
       await page.locator('#gcmClose').click();
       assert.deepEqual(projectValues(await save(page)),projectValues(original));
+    });
+    await scenario('palette buttons retain keyboard focus and support semantic activation', async ({page})=>{
+      const project={...fixture(),cells:Array.from({length:8},()=>cell(' '))};
+      await importFile(page,'#openProjectInput',jsonPayload('palette-input.json',project));
+      const history=await page.evaluate(()=>state.history.length);
+      const a=page.locator('#glyphPalette [data-g="A"]'),b=page.locator('#glyphPalette [data-g="B"]');
+      // Assistive controls may activate a button without pointerdown/keydown.
+      await b.evaluate(button=>button.click());
+      assert.equal((await documentState(page)).glyphPrimary,'B','Semantic click selects the active glyph');
+      await a.focus();await page.keyboard.press('Enter');
+      assert.equal((await documentState(page)).glyphPrimary,'A');
+      assert.equal(await a.evaluate(button=>document.activeElement===button),true,'Selection retains the focused button');
+      await page.keyboard.press('Tab');
+      assert.equal(await b.evaluate(button=>document.activeElement===button),true,'Tab continues from the chosen glyph');
+      await page.keyboard.press('Shift+Enter');
+      assert.equal((await documentState(page)).glyphSecondary,'B');
+      assert.equal(await b.evaluate(button=>document.activeElement===button),true);
+      await page.keyboard.press('Tab');await page.keyboard.press('Shift+Space');
+      assert.equal((await documentState(page)).glyphSecondary,'<');
+      assert.equal(await page.locator('#glyphPalette [data-g="<"]').evaluate(button=>document.activeElement===button),true);
+      await page.locator('#secondaryToggle').click();
+      await page.locator('#glyphPalette [data-g="&"]').evaluate(button=>button.click());
+      assert.equal((await documentState(page)).glyphSecondary,'&','Semantic click respects the active secondary slot');
+      await a.click();assert.equal((await documentState(page)).glyphSecondary,'A','Ordinary pointer click respects the active slot');
+      await b.click({button:'right'});assert.equal((await documentState(page)).glyphSecondary,'B','Real right click still chooses secondary');
+      assert.equal((await documentState(page)).glyphPrimary,'A');
+      assert.equal(await page.evaluate(()=>state.history.length),history,'Selecting glyphs does not create content history');
+      await page.locator('#secondaryToggle').click();
+      await page.locator('#gpEditBtn').click();
+      await b.focus();await b.evaluate(button=>button.click());
+      assert.equal(await page.locator('#paletteDialog').evaluate(dialog=>dialog.open),true,'Semantic activation opens an edited glyph');
+      assert.equal(await page.locator('#paletteGlyphInput').inputValue(),'B');
+      await page.locator('#paletteDialog button[value="cancel"]').click();
+      await page.locator('#glyphPalette [data-g="<"]').click({button:'right'});
+      assert.equal(await page.locator('#glyphPalette [data-g="<"]').count(),0,'Right click removes an unused glyph in Edit mode');
+      await page.locator('#gpEditBtn').click();
+      await page.locator('#gpColoursBtn').click();
+      for(const name of ['Replace glyph A','Colour for glyph A','Hex colour for glyph A','Meaning of glyph A']){
+        assert.equal(await page.getByLabel(name,{exact:true}).count(),1,`Manager exposes the purpose and glyph for ${name}`);
+      }
+      assert.equal(await page.getByRole('button',{name:'Reset colour for glyph A',exact:true}).count(),1);
+      assert.equal(await page.getByRole('button',{name:'Remove glyph A',exact:true}).count(),1);
+      await page.locator('#gcmClose').click();
     });
     await scenario('typing shortcuts in dialogs do not edit canvas or zoom', async ({page})=>{
       await importFile(page,'#openProjectInput',jsonPayload('keyboard.json',fixture()));
@@ -203,11 +304,7 @@ async function runBrowser(browserName) {
       const blank={...fixture(),cols:8,rows:4,cells:Array.from({length:32},()=>cell(' '))};
       await importFile(page,'#openProjectInput',jsonPayload('pointer.json',blank));
       await page.locator('[data-tool="pencil"]').click();
-      const centre=async(x,y)=>{
-        const box=await page.locator('#canvasGrid .cell').nth(y*8+x).boundingBox();
-        assert.ok(box,'Target cell is laid out');
-        return {x:box.x+box.width/2,y:box.y+box.height/2};
-      };
+      const centre=(x,y)=>cellCentre(page,x,y);
       const stroke=async(x0,y0,x1,y1,button)=>{
         const start=await centre(x0,y0),end=await centre(x1,y1);
         await page.mouse.move(start.x,start.y);await page.mouse.down({button});
@@ -247,7 +344,7 @@ async function runBrowser(browserName) {
       assert.equal((await documentState(page)).fieldBg,'#334455','Undoing square cells preserves the preceding background edit');
       await page.locator('#qUndo').click();
       assert.equal(await page.locator('#fieldBgInput').inputValue(),'#102030');
-      assert.equal(await page.locator('#canvasGrid .cell').first().evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(16, 32, 48)');
+      assert.deepEqual(await backgroundPixel(page,0,0),[16,32,48,255]);
       assert.deepEqual(await documentState(page),projectValues(original));
 
       await page.locator('#fileBtn').click();await page.locator('[data-file="properties"]').click();
@@ -269,7 +366,7 @@ async function runBrowser(browserName) {
       assert.deepEqual(await documentState(page),beforeResize,'Rejected Resize does not alter the document');
       await page.locator('#resizeDialog button[value="cancel"]').click();
 
-      await page.locator('[data-tool="text"]').click();await page.locator('#canvasGrid .cell').first().click();
+      await page.locator('[data-tool="text"]').click();await clickCell(page,0,0);
       await page.locator('#textValue').fill('Z Q');await page.locator('#textBg').selectOption('transparent');
       await page.locator('#applyText').click();
       assert.equal(await page.locator('#textDialog').evaluate(el=>el.open),false);
@@ -279,7 +376,164 @@ async function runBrowser(browserName) {
       await page.locator('#qUndo').click();
       assert.deepEqual(await documentState(page),projectValues(original),'Text placement is one reversible action');
     });
+    await scenario('keyboard grid navigation, selection and readable text', async ({page})=>{
+      const project={...fixture(),cols:8,rows:4,cells:Array.from({length:32},()=>cell(' '))};
+      await importFile(page,'#openProjectInput',jsonPayload('accessible.json',project));
+      const grid=page.locator('#canvasWrap');await grid.focus();
+      assert.equal(await grid.getAttribute('role'),'grid');
+      assert.equal(await grid.getAttribute('aria-activedescendant'),'activeCell');
+      assert.equal(await page.locator('#canvasGrid').getAttribute('aria-hidden'),'true');
+      await page.keyboard.press('ArrowRight');await page.keyboard.press('Space');
+      assert.equal((await documentState(page)).cells[1].ch,'A');
+      assert.equal(await page.locator('#activeCell').getAttribute('aria-colindex'),'2');
+      assert.match(await page.locator('#activeCell').getAttribute('aria-label'),/Row 1, column 2: A/);
+      await page.keyboard.press('ArrowDown');await page.keyboard.press('Shift+Space');
+      assert.equal((await documentState(page)).cells[9].ch,'B');
+      await page.keyboard.press('Shift+ArrowRight');
+      assert.equal(await page.locator('#activeCell').getAttribute('aria-selected'),'true');
+      await page.keyboard.press('Delete');
+      assert.deepEqual((await documentState(page)).cells.slice(9,11).map(c=>c.ch),[' ',' ']);
+      await page.keyboard.press('Enter');await page.locator('#textValue').fill('é👨‍👩‍👧‍👦');await page.locator('#applyText').click();
+      const withText=await documentState(page);
+      assert.deepEqual(withText.cells.slice(10,12).map(c=>c.ch),['é','👨‍👩‍👧‍👦'],'Keyboard text entry preserves complete graphemes in separate cells');
+      await grid.focus();await page.keyboard.press('ControlOrMeta+End');
+      assert.equal(await page.locator('#activeRow').getAttribute('aria-rowindex'),'4');
+      assert.equal(await page.locator('#activeCell').getAttribute('aria-colindex'),'8');
+      await page.keyboard.press('Shift+ArrowLeft');await page.keyboard.press('Escape');await page.keyboard.press('Shift+ArrowLeft');
+      assert.deepEqual(await page.evaluate(()=>({x:state.selection.x,w:state.selection.w})),{x:5,w:2},'Escape resets the keyboard selection anchor');
+      await page.keyboard.press('Tab');
+      assert.equal(await grid.evaluate(el=>document.activeElement===el),false,'Tab exits the field');
+      await page.locator('#fileBtn').click();await page.locator('[data-file="textView"]').click();
+      assert.equal(await page.locator('#textViewDialog').evaluate(el=>el.open),true);
+      assert.match(await page.locator('#readableText').inputValue(),/é👨‍👩‍👧‍👦/);
+      assert.equal(await page.locator('#readableText').getAttribute('readonly'),'');
+      await page.locator('#textViewDialog button[value="cancel"]').click();
+    });
+    await scenario('cell colours and full-field PNG survive save and undo', async ({page})=>{
+      await importFile(page,'#openProjectInput',jsonPayload('colours.json',fixture()));
+      await page.locator('#canvasWrap').focus();await page.keyboard.press('ControlOrMeta+Home');
+      await page.locator('#cellStyleBtn').click();
+      await page.locator('#styleFgMode').selectOption('custom');await page.locator('#styleBgMode').selectOption('custom');
+      await page.locator('#styleFg').evaluate(input=>{input.value='#ff0000'});
+      await page.locator('#styleBg').evaluate(input=>{input.value='#123456'});
+      await page.locator('#applyCellStyle').click();
+      let project=await save(page);
+      assert.equal(project.format,'glyphpoint-v3');
+      assert.equal(project.cells[0].fg,'#ff0000');assert.equal(project.cells[0].bg,'#123456');
+      assert.equal(project.cells[1].fg,'','Another copy of the glyph retains its palette inheritance');
+      assert.deepEqual(await backgroundPixel(page,0,0),[18,52,86,255]);
+      await page.locator('#qUndo').click();assert.equal((await documentState(page)).cells[0].fg,'');
+      await page.locator('#qRedo').click();assert.equal((await documentState(page)).cells[0].fg,'#ff0000');
+      await page.locator('#fileBtn').click();await page.locator('[data-file="properties"]').click();
+      await page.locator('#propW').fill('80');await page.locator('#propH').fill('80');await page.locator('#applyProps').click();
+      await page.locator('#zoomSlider').evaluate(input=>{input.value='800';input.dispatchEvent(new Event('input',{bubbles:true}))});
+      await page.evaluate(()=>renderer.whenIdle());
+      const png=await downloadBytes(page,'exportPNG');
+      assert.deepEqual(Array.from(png.subarray(0,8)),[137,80,78,71,13,10,26,10]);
+      assert.equal(png.readUInt32BE(16),1280,'PNG contains every field column at native size, regardless of zoom');
+      assert.equal(png.readUInt32BE(20),1280,'PNG includes rows beyond the visible viewport');
+      project=await save(page);assert.equal(project.cells[0].bg,'#123456');
+    });
+    await scenario('maximum-size worker edits are cancellable, responsive and atomic', async ({page})=>{
+      const project={...fixture(),cols:256,rows:256,cells:Array.from({length:65536},()=>cell(' '))};
+      await importFile(page,'#openProjectInput',jsonPayload('large-worker.json',project));
+      const cancelled=await page.evaluate(async()=>{
+        const history=state.history.length,pending=floodFill(0,0,'A');
+        const busy=document.querySelector('#workspace').getAttribute('aria-busy');
+        const button=document.querySelector('#cancelJob');const visible=!document.querySelector('#jobPanel').hidden;
+        button.click();await pending;
+        return {busy,visible,unchanged:state.cells.every(c=>c.ch===' '),historyUnchanged:state.history.length===history,
+          panelHidden:document.querySelector('#jobPanel').hidden,enabled:!document.querySelector('.ribbonwrap').inert};
+      });
+      assert.deepEqual(cancelled,{busy:'true',visible:true,unchanged:true,historyUnchanged:true,panelHidden:true,enabled:true});
+      const completed=await page.evaluate(async()=>{
+        const initialHistory=state.history.length;
+        let frames=0,painting=true;const tick=()=>{if(painting){frames++;requestAnimationFrame(tick)}};requestAnimationFrame(tick);
+        const result=await floodFill(0,0,'A');painting=false;await renderer.whenIdle();
+        return {result,frames,filled:state.cells.every(c=>c.ch==='A'),count:state.cells.length,history:state.history.length-initialHistory,
+          domCells:document.querySelectorAll('#canvasGrid .cell').length,stats:renderer.stats(),busy:document.querySelector('#workspace').hasAttribute('aria-busy')};
+      });
+      assert.equal(completed.result,true);assert.equal(completed.filled,true);assert.equal(completed.count,65536);
+      assert.ok(completed.frames>0,'Animation frames run while the worker computes the field');
+      assert.equal(completed.history,1,'The completed worker edit has one undo transaction');
+      assert.equal(completed.domCells,0);assert.equal(completed.busy,false);
+      assert.ok(completed.stats.maxFrameCells<=512);assert.ok(completed.stats.backingPixels<=16*1024*1024);
+      await page.locator('#qUndo').click();assert.equal(await page.evaluate(()=>state.cells.every(c=>c.ch===' ')),true);
+      await page.locator('#resizeBtn').click();await page.locator('#keepAspect').uncheck();
+      await page.locator('#resizeW').fill('128');await page.locator('#resizeH').fill('256');
+      const resizeCancelled=await page.evaluate(async()=>{
+        const history=state.history.length,pending=applyResizeSkew();
+        const modalClosed=!document.querySelector('#resizeDialog').open;
+        const cancel=document.querySelector('#cancelJob'),r=cancel.getBoundingClientRect();
+        const reachable=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)===cancel;
+        const focus=document.activeElement===cancel;
+        // Dispatch through the real keyboard handler in the same task so a fast
+        // worker cannot finish before the cancellation regression is exercised.
+        cancel.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));
+        const result=await pending;
+        return {result,modalClosed,reachable,focus,cols:state.cols,rows:state.rows,history:state.history.length-history,
+          blank:state.cells.every(c=>c.ch===' ')};
+      });
+      assert.deepEqual(resizeCancelled,{result:false,modalClosed:true,reachable:true,focus:true,cols:256,rows:256,history:0,blank:true},'Resize exposes its Cancel button and Escape cancels before committing');
+    });
+    await scenario('mobile viewport supports touch secondary drawing and panning', async ({page,context})=>{
+      const project={...fixture(),cols:80,rows:80,cells:Array.from({length:6400},()=>cell(' '))};
+      project.cells[1]=cell('<');
+      await importFile(page,'#openProjectInput',jsonPayload('touch.json',project));
+      await assertMobileLayout(page,'Initial toolbar');
+      const toggle=page.locator('#secondaryToggle');await toggle.tap();
+      const button=await toggle.boundingBox();assert.ok(button.width>=44&&button.height>=44,'Touch control has a 44-pixel target');
+      assert.equal(await toggle.getAttribute('aria-pressed'),'true');
+      await page.locator('#glyphPalette [data-g="&"]').tap();
+      assert.equal((await documentState(page)).glyphSecondary,'&','Touch palette selection targets the active secondary slot');
+      assert.equal((await documentState(page)).glyphPrimary,'A');
+      await assertMobileLayout(page,'Glyph palette');
+      const first=await cellCentre(page,0,0);await page.touchscreen.tap(first.x,first.y);
+      assert.equal((await documentState(page)).cells[0].ch,'&','A trusted touch tap paints the secondary glyph without a right mouse button');
+      await page.locator('[data-tool="picker"]').tap();const pick=await cellCentre(page,1,0);await page.touchscreen.tap(pick.x,pick.y);
+      assert.equal((await documentState(page)).glyphSecondary,'<','Touch glyph picker updates the active secondary slot');
+      assert.equal((await documentState(page)).glyphPrimary,'A');
+      await page.locator('[data-shape="line"]').tap();await assertMobileLayout(page,'Shapes');
+      const shape=await cellCentre(page,2,1);await page.touchscreen.tap(shape.x,shape.y);
+      assert.equal((await documentState(page)).cells[82].ch,'<','A shape uses the secondary slot selected through touch');
+      await page.locator('#panToggle').tap();
+      await assertMobileLayout(page,'Pan controls');
+      const before=await documentState(page),box=await page.locator('#scroller').boundingBox();
+      const start={x:box.x+box.width*.8,y:box.y+box.height*.8},end={x:box.x+box.width*.3,y:box.y+box.height*.3};
+      if(browserName==='chromium'){
+        // Chromium exposes native touch dragging through its browser protocol.
+        const input=await context.newCDPSession(page);
+        await input.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{...start,id:0}]});
+        await input.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:(start.x+end.x)/2,y:(start.y+end.y)/2,id:0}]});
+        await input.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{...end,id:0}]});
+        await input.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+        await input.detach();
+      }else{
+        // Playwright exposes touch taps on these engines; pointer dragging checks
+        // the same pan handlers without claiming a physical touch-device test.
+        await page.mouse.move(start.x,start.y);await page.mouse.down();await page.mouse.move(end.x,end.y,{steps:4});await page.mouse.up();
+      }
+      await page.evaluate(()=>renderer.whenIdle());
+      const scroll=await page.locator('#scroller').evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}));
+      assert.ok(scroll.x>0||scroll.y>0,'Pan mode scrolls the field');
+      assert.deepEqual(await documentState(page),before,'Panning leaves artwork unchanged');
+      assert.equal(await page.locator('#canvasGrid').evaluate(el=>getComputedStyle(el).touchAction),'none');
+      await page.locator('#uiModeToggle').tap();
+      await page.locator('.ribbonwrap').evaluate(el=>{el.scrollLeft=0;el.scrollTop=0});
+      await page.evaluate(async()=>{await new Promise(requestAnimationFrame);await renderer.whenIdle()});
+      await assertMobileLayout(page,'Classic mobile toolbar');
+      assert.equal(await page.locator('#app').evaluate(el=>el.classList.contains('classic')),true);
+      await page.locator('#glyphPalette [data-g="&"]').tap();
+      await assertMobileLayout(page,'Classic mobile palette');
+      await page.locator('.transformgrid .xformbtn').first().scrollIntoViewIfNeeded();
+      await assertMobileLayout(page,'Classic mobile transforms');
+    },{viewport:{width:390,height:844},hasTouch:true,...(browserName==='firefox'?{}:{isMobile:true})});
     console.log(`${browserName}: ${completed} browser scenarios passed`);
   } finally { await browser.close(); }
 }
-(async()=>{for(const name of browserNames)await runBrowser(name)})().catch(error=>{console.error(error);process.exitCode=1});
+(async()=>{
+  for(const name of browserNames){
+    await runBrowser(name);
+    if(!smoke)await require('./renderer.browser.cjs').runRendererBrowser(name);
+  }
+})().catch(error=>{console.error(error);process.exitCode=1});

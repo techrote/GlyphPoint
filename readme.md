@@ -1,70 +1,94 @@
 # GlyphPoint
 
-**A standalone, offline glyph-grid editor for coloured ASCII and Unicode artwork.** Draw with characters, compose text, arrange selections, and save editable projects from a desktop browser. Switch between a compact ribbon and a classic sidebar without changing the document.
+**An offline Unicode drawing editor with local recovery, individual cell colours, and a Canvas 2D workspace.** Draw with characters, compose text, arrange selections, and share editable projects or fixed images. One downloaded HTML file includes the editor and its default font; no account, server, or runtime package installation is required.
+
+The current development version is **2.0.0-rc.1**, using the **v3 project format**. The maintained filename remains **[GlyphPoint-v1a-layout-fixed.html](GlyphPoint-v1a-layout-fixed.html)** so existing links keep working. Release preparation and platform qualification are documented separately; this version label does not mean a release has been published or every CI combination has passed.
 
 ## Start here
 
-1. Download this repository using **Code → Download ZIP**, then extract it.
-2. Open **[GlyphPoint-v1a-layout-fixed.html](GlyphPoint-v1a-layout-fixed.html)** in your browser. This is the maintained application. GitHub's source viewer does not run the editor.
-3. Choose a glyph, select Pencil, and draw. Left click uses the primary glyph; right click uses the secondary.
-4. Use **File → Save project** to download an editable JSON file. Keep that file: the canvas is not autosaved.
+1. Choose **Code → Download ZIP** in GitHub and extract it, or download the maintained HTML file using **Download raw file**.
+2. Open `GlyphPoint-v1a-layout-fixed.html` in a current browser. GitHub's source viewer does not run the editor.
+3. Choose a palette glyph, select Pencil, and draw. Use the secondary mouse button or **Use secondary glyph** for the other glyph slot. **Focus field** enables keyboard editing, and **Pan field** lets a touch/pointer drag scroll without painting.
+4. Watch the recovery status after an edit. **Recovery saved** confirms a local checkpoint; **Recovery** lets you explicitly restore one after reloading.
+5. Choose **File → Save project** for a portable editing copy. Supported browsers offer a native file destination; other browsers request a download. **Download project JSON…** always requests a downloadable copy. Keep and verify the file.
 
-The application needs no installation, build step, account, server, or runtime dependency. For an optional local HTTP launch, run `python -m http.server 8000 --bind 127.0.0.1` from the repository and open [the editor on localhost](http://127.0.0.1:8000/GlyphPoint-v1a-layout-fixed.html). On Windows, `py -m http.server 8000 --bind 127.0.0.1` is an alternative.
+For an optional consistent localhost origin, run `python3 -m http.server 8000 --bind 127.0.0.1` in the repository and open [the editor on localhost](http://127.0.0.1:8000/GlyphPoint-v1a-layout-fixed.html). On Windows, use `py -m http.server 8000 --bind 127.0.0.1`. The server serves the editor; it does not receive your artwork.
+
+Follow the [new-user guide](docs/new-user-guide.md) for a worked first drawing, saving, and recovery exercise. The [manual](docs/manual.md) describes all controls and their interactions.
+
+## What you can do
+
+| Area | Capabilities |
+| --- | --- |
+| Draw | Pencil, flood fill, eraser, text, glyph picker, magnifier, circular/square/ratio brushes, and twelve line/shape choices. |
+| Colour | Palette defaults plus independent foreground/background overrides per cell. Identical glyphs can use different colours; even a space can carry a painted background. |
+| Unicode | One extended grapheme per cell, including combining sequences and joined emoji, up to 32 Unicode code points. |
+| Arrange | Rectangular/free-form selection, move, copy, cut, paste, clear, crop, rotate, and mirror while retaining cell styling. |
+| Control edges | Expand to fit, reject overflow, or explicitly clip selected placement/transform operations. Resize/Skew has its own edge choice and samples backward into the source. |
+| Keep work | Automatic browser-local checkpoints; native direct Save/Save As where available; explicit JSON downloads everywhere. |
+| Share | v3 JSON projects, reusable palette files, text, standalone HTML with embedded project data/font, whole-field PNG, and full-field printing. |
+| Navigate | Ribbon/classic layouts, zoom, rulers, grid guides, square cells, keyboard grid editing, readable text/copy-all, and touch pan/secondary controls. |
+| Handle larger fields | Viewport-based Canvas rendering with bounded frame work. Fill and Resize/Skew use cancellable worker jobs, with a cooperative fallback. |
+
+New artwork uses embedded **DejaVu Sans Mono** regular, bold, oblique, and bold-oblique faces. Other chosen fonts and glyphs outside its coverage can use platform fallback. **PNG** preserves the rendered pixels when the receiving device's fonts must not affect the image. The [font notices](THIRD_PARTY_NOTICES.md) and [font provenance manifest](assets/fonts/manifest.json) accompany the bundled assets.
+
+## Saving and recovery
+
+Recovery keeps the latest checkpoint for each tab/document session in this browser's storage: up to **12 entries**, **32 MiB of serialized project payloads in total**, and **16 MiB per entry**. It normally schedules after 750 ms without another edit, or within five seconds during continuous editing. Old entries can be evicted; clearing site data, changing browser/profile/address, private browsing, or storage errors can affect availability. Restore a checkpoint explicitly through **Recovery** and retain JSON files for portable copies.
+
+A direct Save clears the unsaved marker only after a successful file write of the current revision. A download request leaves the marker in place because the editor cannot verify that the file was kept. The first direct Save chooses a destination; opening a project does not silently authorize overwriting its source file. Recovery is separate from file saving and does not retain session Undo history.
 
 ## Documentation
 
 | Document | Purpose |
 | --- | --- |
-| [New-user guide](docs/new-user-guide.md) | First launch, a first drawing, saving, reopening, and common surprises. |
-| [Comprehensive instruction manual](docs/manual.md) | Every tool, palette control, selection operation, file format, shortcut, and limit. |
-| [Agent/RAG reference](RAG.md) | Searchable, source-grounded architecture, invariants, schemas, and task-to-code routing. |
-| [Agent working instructions](AGENTS.md) | How to make and verify changes in this repository. |
-| [Contributor/developer guide](CONTRIBUTING.md) | Local setup, test commands, implementation conventions, and review expectations. |
-| [Project format reference](docs/project-format.md) | JSON fields, normalization, compatibility, and HTML round trips. |
-| [Quality audit](docs/quality-audit-2026-11-03.md) | Verified defects, repairs, evidence, and remaining limitations. |
-| [Security and data handling](SECURITY.md) | Import/export trust boundaries, storage, and reporting guidance. |
-| [Change log](CHANGELOG.md) | User-visible changes from the original uploaded versions. |
+| [New-user guide](docs/new-user-guide.md) | First launch, drawing, cell colours, keyboard/touch use, saving, and recovery. |
+| [Instruction manual](docs/manual.md) | Every control, workflow, interchange format, shortcut, and material limit. |
+| [Project format reference](docs/project-format.md) | v3 schema, legacy migration, grapheme/colour contracts, and HTML interchange. |
+| [Agent/RAG reference](RAG.md) | Searchable source map, invariants, state transitions, and task routing. |
+| [Agent instructions](AGENTS.md) | Working and verification rules for this repository. |
+| [Contributor guide](CONTRIBUTING.md) | Source modules, deterministic build, tests, CI, and package preparation. |
+| [Original quality audit](docs/quality-audit-2026-11-03.md) | Historical audit evidence and the first maintenance repairs. |
+| [Implementation follow-up](docs/quality-followup-2026-11-03.md) | Follow-up solutions, validation evidence, and remaining limitations. |
+| [Platform qualification](docs/platform-qualification.md) | Automated coverage, planned combinations, and physical-device/accessibility evidence boundaries. |
+| [Security and data handling](SECURITY.md) | Storage, import/export trust boundaries, resource budgets, and reporting. |
+| [Release process](docs/release-process.md) | Candidate packaging, checksums, qualification gate, and draft-release workflow. |
+| [License decision](docs/license-decision.md) | The owner's outstanding project-license choice and release implications. |
+| [Change log](CHANGELOG.md) | Current candidate changes and historical maintenance entries. |
 
-## Capabilities
+## Files, limits, and compatibility
 
-- Pencil, flood fill, text placement, eraser, glyph picker, and magnifier.
-- Circular, square, and rectangular brush tips; twelve line/shape choices with stroke and fill controls.
-- Rectangular and free-form selections; move, copy, cut, paste, clear, crop, rotate, and mirror.
-- Resize by cell count or percentage, skew, or extend/crop the field through Properties.
-- A colour per glyph across the document, a shared field background, custom glyph labels, and reusable palettes/colourways.
-- Editable JSON projects, plain-text interchange, and standalone HTML exports containing validated editable project data.
-- Gridlines, rulers, 25–800% zoom, square cells, full screen, and browser printing.
-
-## Files and compatibility
-
-| File | Status |
+| Path | Role |
 | --- | --- |
-| `GlyphPoint-v1a-layout-fixed.html` | Maintained application, including the November 2026 quality repairs. |
-| `GlyphPoint-v1a.html` | Historical snapshot; not covered by the current fixes. |
-| `GlyphPoint-v04a.html` | Earlier historical snapshot; not covered by the current fixes. |
+| `GlyphPoint-v1a-layout-fixed.html` | Maintained, generated, self-contained application. End users open this file. |
+| `src/` | Editable HTML template and runtime modules assembled into the maintained application. |
+| `assets/fonts/` | Embedded font CSS, provenance/hashes, and independent font license notice. |
+| `GlyphPoint-v1a.html`, `GlyphPoint-v04a.html` | Historical snapshots; current fixes and v3 features do not apply to them. |
 
-The historical filenames stay in place for comparison and existing links. Use the maintained file for new work and imports. The application title no longer ambiguously says “v10”; filenames are not a stable project-schema version.
+Fields allow **1–512 cells per axis** and **65,536 cells overall**. Palettes allow **4,096 entries including reserved space**. Imports are limited to **16 MiB**; foreign HTML has additional node/style complexity budgets. These limits bound work and allocation; they do not promise identical performance on every device.
 
-A field can be **1–512 cells per axis**, with **at most 65,536 cells overall**. Imports are limited to **16 MiB** and palettes to **4,096 entries including a reserved space**. These bound allocations; they are not a guarantee of smooth maximum-size editing on every device. One cell holds one Unicode code point, not a complete multi-code-point emoji or grapheme. See the manual for font and colour-model limitations.
+The writer produces `glyphpoint-v3`. Legacy v1/v2 projects are migrated to retain their original palette-based appearance. New grapheme and individual-colour features require the maintained editor. Glyph storage support does not guarantee font coverage or identical emoji rendering. Foreign HTML imports a bounded safe CSS subset rather than arbitrary page layout or active content.
 
-Palette choices and interface mode can persist in local browser storage. Artwork remains in memory until you download a project. Saving requests a browser download and does not overwrite the opened file in place. Exporting text or HTML does not mark an unsaved project as saved.
+## Development
 
-## Development checks
-
-Node.js 22 or newer is used for development only. Node 24 is used in CI.
+End users need no build step. Developers edit the files in `src/`, then rebuild the committed standalone HTML. Use Node.js 22 or newer; CI is configured for Node 24.
 
 ```sh
+npm run build
 npm run check
 npm test
 npm ci
-npx playwright install chromium firefox
-npm run test:browser
+npx playwright install chromium firefox webkit
+npm run test:browser -- chromium firefox webkit
+npm run release:package
 ```
 
-The first two commands use only Node's standard library. Browser tests use the pinned Playwright development dependency and run the actual standalone HTML in Chromium and Firefox. On a minimal Linux machine, use `npx playwright install --with-deps chromium firefox` to install browser system dependencies as well.
+Build, source checks, model tests, and packaging use Node's standard library. Browser tests use the pinned Playwright development dependency. `npm run test:browser` defaults to Chromium and Firefox; pass one or more explicit engine names to select a subset. Linux systems missing browser libraries can install them with `npx playwright install --with-deps chromium firefox webkit`.
 
-The [Quality workflow](.github/workflows/quality.yml) has two bounded jobs: static/documentation plus editor regressions, and both browser suites. Superseded runs on the same PR/ref are cancelled. There is no application bundler or package-publication step.
+The [Quality workflow](.github/workflows/quality.yml) defines two job blocks that expand into **four jobs**: source/docs/model/package checks, the full Linux three-engine suites, Windows Chromium smoke tests, and macOS WebKit smoke tests. The browser runner includes editor, renderer, recovery, and HTML-interchange coverage in full mode. These are configured qualification gates; check the exact commit's results and the [qualification record](docs/platform-qualification.md) for completed evidence. Automated OS/browser runs and emulated touch do not establish physical-device or screen-reader conformance.
+
+`npm run release:package` creates a ZIP, SHA-256 checksum, and per-file/source manifest in `dist/`. It packages the current tree without publishing. The separate [draft-release workflow](.github/workflows/release.yml) is manually dispatched on `main` and requires an owner-selected root `LICENSE` plus successful Quality results for that exact main commit. See the [release process](docs/release-process.md).
 
 ## License status
 
-No project license was present in the audited repository, and this pass does not choose one on the owner's behalf. Dependency licenses do not establish a license for GlyphPoint itself.
+The project-license choice remains **pending the repository owner's decision**; no project license is inferred or selected from third-party dependencies. The embedded DejaVu font has its own Bitstream Vera/DejaVu notice, which does not license GlyphPoint's application code. See [License decision](docs/license-decision.md), [third-party notices](THIRD_PARTY_NOTICES.md), and the [font license](assets/fonts/LICENSE-DejaVu.txt). Candidate packaging is available, while the draft-release workflow keeps the explicit license gate.

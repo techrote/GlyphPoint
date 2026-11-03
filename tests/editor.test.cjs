@@ -70,6 +70,7 @@ test('a horizontal or single-cell ellipse produces a finite visible outline', ()
 
 test('oversized paste clips the landed selection and can be copied safely', async () => {
   const e = createEditor();
+  e.run('state.edgePolicy="clip"');
   documentOf(e, 4, 2);
   e.run(`
     state.selection={type:'rect', x:3,y:1,w:1,h:1};
@@ -84,6 +85,7 @@ test('oversized paste clips the landed selection and can be copied safely', asyn
 
 test('moving a selection beyond an edge clips its new bounds and contents', () => {
   const e = createEditor();
+  e.run('state.edgePolicy="clip"');
   documentOf(e, 4, 4);
   e.run(`
     setCell(1,1,makeCell('A'));setCell(2,1,makeCell('B'));
@@ -99,8 +101,28 @@ test('moving a selection beyond an edge clips its new bounds and contents', () =
   assert.equal(captured.map[0][1].ch, 'A');
 });
 
+test('clipped selected rotations report discarded overflow and remain undoable', () => {
+  const e = createEditor();
+  documentOf(e, 4, 2);
+  e.run(`
+    setCell(1,1,{...makeCell('A'),fg:'#ff0000',bg:'#123456'});
+    setCell(2,1,makeCell('B'));setCell(3,1,makeCell('C'));
+    state.selection={type:'rect',x:1,y:1,w:3,h:1};state.edgePolicy='clip';
+  `);
+  const before = plain(e.run('captureDocument()'));
+  e.run("transform('rot90')");
+  assert.deepEqual(painted(e), [{ch:'A',x:1,y:1}]);
+  assert.match(e.element('msgStat').textContent, /Rotated in Clip mode; overflow discarded/);
+  assert.equal(e.state.cells[5].fg,'#ff0000');assert.equal(e.state.cells[5].bg,'#123456');
+  e.run('undo()');
+  assert.deepEqual(plain(e.run('captureDocument()')),before,'Undo recovers the discarded cells and complete styles');
+  e.run("transform('flipH')");
+  assert.doesNotMatch(e.element('msgStat').textContent, /discarded/,'A transform that fits does not claim to have clipped');
+});
+
 test('free selection moves retain only the landed mask entries', () => {
   const e = createEditor();
+  e.run('state.edgePolicy="clip"');
   documentOf(e, 4, 4);
   e.run(`
     setCell(1,1,makeCell('A'));setCell(2,2,makeCell('B'));

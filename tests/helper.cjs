@@ -135,6 +135,7 @@ function createEditor(options = {}) {
     activeElement: null,
     querySelector(selector) {
       if (/^#[\w-]+$/.test(selector)) return element(selector.slice(1));
+      if (selector === '.ribbonwrap') return element('ribbonwrap');
       if (selector === 'dialog[open]') {
         return [...elements.values()].find(el => el.matches(selector)) || null;
       }
@@ -156,7 +157,7 @@ function createEditor(options = {}) {
       setItem: (key, value) => storage.set(key, String(value)),
       removeItem: key => storage.delete(key),
     },
-    Blob, URL, TextEncoder, TextDecoder,
+    Blob, URL, TextEncoder, TextDecoder, AbortController,
     setTimeout, clearTimeout,
     requestAnimationFrame: callback => callback(),
     cancelAnimationFrame() {},
@@ -189,6 +190,7 @@ function createEditor(options = {}) {
     renderPreview = function() {};
     renderRulers = function() {};
     buildGlyphPalette = function() {};
+    updateGlyphSlots = function() {};
     buildGlyphColourPanel = function() {};
     renderGlyphColourManager = function() {};
     updateClassicOverflow = function() {};

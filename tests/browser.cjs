@@ -363,11 +363,11 @@ async function runBrowser(browserName) {
       await page.locator('#propertiesDialog button[value="cancel"]').click();
 
       await page.locator('#resizeBtn').click();await page.locator('#keepAspect').uncheck();
-      await page.locator('#resizeW').fill('513');
+      await page.locator('#resizeW').fill('4097');
       const beforeResize=await documentState(page),resizeAlert=page.waitForEvent('dialog',{predicate:dialog=>dialog.type()==='alert'});
       await page.locator('#applyResize').click();await resizeAlert;
       assert.equal(await page.locator('#resizeDialog').evaluate(el=>el.open),true,'Invalid Resize stays open for correction');
-      assert.equal(await page.locator('#resizeW').inputValue(),'513');
+      assert.equal(await page.locator('#resizeW').inputValue(),'4097');
       assert.deepEqual(await documentState(page),beforeResize,'Rejected Resize does not alter the document');
       await page.locator('#resizeDialog button[value="cancel"]').click();
 

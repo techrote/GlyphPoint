@@ -1,6 +1,6 @@
 # Project and interchange formats
 
-This is the maintained editor's data contract. Development sources are [app.js](../src/app.js), [interchange.js](../src/interchange.js), [recovery.js](../src/recovery.js), [renderer.js](../src/renderer.js), and [workflows.js](../src/workflows.js). The build embeds these modules in [GlyphPoint-v1a-layout-fixed.html](../GlyphPoint-v1a-layout-fixed.html). Filename versions and project-schema versions are independent.
+This is the maintained editor's data contract. Development sources are [app.js](../src/app.js), [interchange.js](../src/interchange.js), [recovery.js](../src/recovery.js), [renderer.js](../src/renderer.js), and [workflows.js](../src/workflows.js). The build embeds these modules in [GlyphPoint-RC.html](../GlyphPoint-RC.html). Filename versions and project-schema versions are independent.
 
 ## Contents
 
@@ -79,18 +79,18 @@ A project stores text and font preferences, not glyph outlines. The bundled font
 
 | Resource | Limit |
 | --- | --- |
-| Width or height | 1–512 cells each. |
-| Field area | At most 65,536 cells; 512 × 512 exceeds the area budget. |
-| Input file | At most 16 MiB (`16 * 1024 * 1024` bytes), checked before reading/parsing. |
-| Project save / HTML export | At most the 16 MiB re-import budget. A JSON save can omit indentation when necessary to fit. |
+| Width or height | 1–4,096 cells each. |
+| Field area | At most 1,048,576 cells; 4096 × 4096 exceeds the area budget; 1024 × 1024 is supported. |
+| Input file | JSON projects: 256 MiB (`256 * 1024 * 1024` bytes); palette, text and HTML: 16 MiB, checked before reading/parsing. |
+| Project save / HTML export | JSON project saves: 256 MiB maximum, compacting indentation if necessary. HTML export: 16 MiB maximum, reflecting its separate importer budget. |
 | Palette | At most 4,096 unique entries, including reserved U+0020 space. |
 | Grapheme | One cluster, at most 32 Unicode code points. C0/C1 controls, lone surrogates, U+2028, and U+2029 are rejected. |
 | Label | 80 UTF-16 code units after normalization. |
 | External HTML tree | At most 200,000 visited nodes; nesting depth at most 100. |
 | HTML styles | At most 131,072 style characters, 512 rules, 2,048 selectors, and 8,192 declarations. |
 | CSS matching | At most 1,000,000 selector-part checks; supported selectors are at most 256 characters and 16 parts. |
-| Retained undo + redo | At most 60 snapshots and 262,144 cell records combined. |
-| Recovery archive | At most 12 document checkpoints and 32 MiB of UTF-8 payloads total; each payload at most 16 MiB. |
+| Retained undo + redo | At most 60 snapshots and 2,097,152 cell records combined. |
+| Recovery archive | At most 12 checkpoints, 32 MiB of encoded payloads total, and 16 MiB per record. Large repetitive fields use lossless recovery-only cell-run encoding. |
 | PNG image | At most 32 × 1024 × 1024 pixels and 16,384 pixels per side. |
 
 These are allocation budgets, not latency guarantees. The renderer paints a viewport-sized canvas and expensive fill/resize operations use workers or cooperative tasks; normalization, project serialization, palette UI, and some smaller edits still perform synchronous work.
@@ -195,7 +195,7 @@ Where direct saving is unavailable, Save requests a JSON download. **Download pr
 
 Recovery uses IndexedDB database `glyphpoint.recovery.v1`, with `documents` and `summaries` stores. It schedules the latest checkpoint per document identity after 750 ms without a new edit, with a five-second timer during continuous editing. Browser suspension or busy JavaScript can delay those timers. Writes are serialized; queued checkpoints for the same document collapse to the latest captured revision. The JSON snapshot is detached before a document can be replaced. The pending-write queue is also bounded; if storage is blocked and that queue fills, the current document retries when it drains.
 
-Each tab/session and each New/Open/recovered document gets a unique key. Two tabs do not overwrite the same checkpoint merely because filenames match. The archive holds at most 12 document checkpoints and 32 MiB of UTF-8 JSON payloads, with a 16 MiB individual limit. The oldest other entries are removed in the same transaction as a new checkpoint. A failed transaction rolls back both the new write and its proposed evictions. Payload budgets are not the browser's exact disk/quota accounting.
+Each tab/session and each New/Open/recovered document gets a unique key. Two tabs do not overwrite the same checkpoint merely because filenames match. The archive holds at most 12 document checkpoints and 32 MiB of encoded JSON payloads, with a 16 MiB individual limit. The oldest other entries are removed in the same transaction as a new checkpoint. A failed transaction rolls back both the new write and its proposed evictions. Payload budgets are not the browser's exact disk/quota accounting.
 
 **Recovery** lists entries and offers explicit **Recover** and **Delete checkpoint** actions; startup only advertises their availability. Recovery validates the envelope, byte size, JSON, and project through the same normalizer before installation. Reading a candidate never installs it by itself. Deleting the current checkpoint suppresses its recreation until another edit; a different active tab may create another checkpoint after its own next edit.
 

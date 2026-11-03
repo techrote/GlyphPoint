@@ -52,8 +52,8 @@ const GPRenderer = (() => {
   }
 
   function exportDimensions(cols, rows, cellWidth, cellHeight, scale = 1) {
-    if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols < 1 || rows < 1 || cols > 512 || rows > 512 || cols * rows > 65536) {
-      throw Error('PNG export requires a valid field of at most 65,536 cells.');
+    if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols < 1 || rows < 1 || cols > 4096 || rows > 4096 || cols * rows > 1048576) {
+      throw Error('PNG export requires a field within 4,096 cells per axis and 1,048,576 cells overall.');
     }
     if (!Number.isFinite(scale) || scale <= 0 || scale > 8 || !Number.isFinite(cellWidth) || !Number.isFinite(cellHeight) || cellWidth <= 0 || cellHeight <= 0) {
       throw Error('PNG export requires finite cell dimensions and a scale between 0 and 8.');

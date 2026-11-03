@@ -1,6 +1,6 @@
 # Developer guide
 
-GlyphPoint ships as one offline HTML application. Its maintained sources are split into focused modules for development, then assembled deterministically into **`GlyphPoint-v1a-layout-fixed.html`**. The Node package supplies development checks and candidate packaging; it is private and is not an npm-distributed runtime.
+GlyphPoint ships as one offline HTML application. Its maintained sources are split into focused modules for development, then assembled deterministically into **`GlyphPoint-RC.html`**. The Node package supplies development checks and candidate packaging; it is private and is not an npm-distributed runtime.
 
 ## Start with the current source
 
@@ -46,7 +46,7 @@ npm run test:browser -- chromium firefox webkit
 
 On Linux, `npx playwright install --with-deps chromium firefox webkit` installs missing browser libraries as well. This is a development setup action, not an end-user requirement. Keep Playwright pinned and upgrade the package/lockfile/browser binaries deliberately; do not call the pinned version the newest available release.
 
-For manual work, open the built HTML locally. An optional server is `python3 -m http.server 8000 --bind 127.0.0.1`, or `py -m http.server 8000 --bind 127.0.0.1` on Windows. Open [the localhost editor](http://127.0.0.1:8000/GlyphPoint-v1a-layout-fixed.html). Use a consistent origin when checking recovery; changing the port, browser/profile, or file URL can change the storage context.
+For manual work, open the built HTML locally. An optional server is `python3 -m http.server 8000 --bind 127.0.0.1`, or `py -m http.server 8000 --bind 127.0.0.1` on Windows. Open [the localhost editor](http://127.0.0.1:8000/GlyphPoint-RC.html). Use a consistent origin when checking recovery; changing the port, browser/profile, or file URL can change the storage context.
 
 ## What each test layer establishes
 
@@ -68,7 +68,7 @@ The current format is **`glyphpoint-v3`**. Each cell has one printable extended 
 
 `setCell` updates glyph counts, palette membership, dirty state, and renderer invalidation for individual writes. Bulk installation and transformations may replace cell arrays and resynchronize derived state through `rebuildGrid`; the historical function name no longer implies creating DOM spans. The renderer paints visible Canvas cells in scheduled batches and keeps artwork separate from selection, cursor, and preview overlays. Whole-field PNG/Print must render the complete document, independent of scroll position or pending viewport painting.
 
-Respect the 512-cell axis limit, 65,536-cell area budget, 4,096-entry palette including reserved space, and combined history budgets. Free-form masks define selected cells; their bounding rectangle does not authorize modifying holes. Explicit foreground/background and font/styles must travel with cells through copy, move, transforms, resize, recovery, and native exports.
+Respect the 4,096-cell axis limit, 1,048,576-cell area budget, 4,096-entry palette including reserved space, and combined history budgets. Free-form masks define selected cells; their bounding rectangle does not authorize modifying holes. Explicit foreground/background and font/styles must travel with cells through copy, move, transforms, resize, recovery, and native exports.
 
 Plan edge behaviour before mutation. Expand and Reject must leave the original document/history intact if prospective dimensions fail. Clip is an explicit user choice and reports discarded overflow. Resize/Skew uses sequential horizontal/vertical shears with inverse sampling; do not reintroduce forward-write holes, collisions, or singular combined-shear calculations.
 

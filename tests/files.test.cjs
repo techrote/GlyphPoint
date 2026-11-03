@@ -7,7 +7,7 @@ const project = () => ({format:'glyphpoint-v2',cols:1,rows:1,cells:[{ch:'A'}],gl
 
 test('project normalization rejects invalid dimensions, arrays, glyphs and schema types', () => {
   const e = createEditor();
-  for (const patch of [{cols:NaN},{cols:0},{rows:1.2},{cols:512,rows:512},{cells:[]},{cells:[{ch:'AB'}]},{cells:[{ch:'\ud800'}]},{square:'yes'},{fieldBg:'red'},{kind:'palette'},{glyphPalette:[{glyph:'A'},{glyph:'A'}]}]) {
+  for (const patch of [{cols:NaN},{cols:0},{rows:1.2},{cols:4097,rows:1},{cells:[]},{cells:[{ch:'AB'}]},{cells:[{ch:'\ud800'}]},{square:'yes'},{fieldBg:'red'},{kind:'palette'},{glyphPalette:[{glyph:'A'},{glyph:'A'}]}]) {
     e.context.payload={...project(),...patch};
     assert.throws(()=>e.run('normaliseProject(payload)'));
   }
@@ -25,8 +25,8 @@ test('legacy v1 data normalizes safe colours, fonts and reserved space without e
 
 test('file budget rejects oversized input before invoking its text reader', async () => {
   const e = createEditor();let reads=0;
-  e.context.file={size:16*1024*1024+1,async text(){reads++;return '{}'}};
-  await assert.rejects(e.run('readImportFile(file)'),/16 MiB/);assert.equal(reads,0);
+  e.context.file={size:256*1024*1024+1,async text(){reads++;return '{}'}};
+  await assert.rejects(e.run('readImportFile(file)'),/256 MiB/);assert.equal(reads,0);
 });
 
 test('text parsing counts code points, expands four-column tabs and preserves extra blank rows', () => {
@@ -35,7 +35,7 @@ test('text parsing counts code points, expands four-column tabs and preserves ex
   const result=plain(e.run('textDocument(text)'));
   assert.equal(result.cols,5);assert.equal(result.rows,3);
   assert.deepEqual(result.cells.map(c=>c.ch),['A','😀',' ',' ','B','Z',' ',' ',' ',' ',' ',' ',' ',' ',' ']);
-  for(const text of ['', '\u0000', 'x'.repeat(513), Array(514).fill('x').join('\n')]){e.context.text=text;assert.throws(()=>e.run('textDocument(text)'))}
+  for(const text of ['', '\u0000', 'x'.repeat(4097), Array(4098).fill('x').join('\n')]){e.context.text=text;assert.throws(()=>e.run('textDocument(text)'))}
 });
 
 test('failed and superseded file reads cannot mutate the current document or history', async () => {
@@ -93,4 +93,17 @@ test('export escapes script-closing palette labels and preserves normalized proj
   assert.ok(!html.includes('</script><img'));assert.ok(html.includes('\\u003c/script\\u003e'));
   const json=html.match(/<script id="glyphpoint-data" type="application\/json">([\s\S]*?)<\/script>/)[1];
   const restored=JSON.parse(json);assert.equal(restored.glyphPalette[0].represents,e.context.label);assert.deepEqual(restored.cells.map(c=>c.ch),['<','&']);
+});
+
+
+test('expanded dimensions accept one million cells and reject budget overflow before allocation', () => {
+  const e=createEditor();
+  for(const [cols,rows] of [[512,512],[1024,1024],[4096,256],[256,4096]]){
+    e.context.cols=cols;e.context.rows=rows;
+    assert.deepEqual(plain(e.run('validateDimensions(cols,rows)')),{cols,rows});
+  }
+  for(const [cols,rows] of [[4097,1],[1,4097],[1024,1025],[4096,257]]){
+    e.context.cols=cols;e.context.rows=rows;
+    assert.throws(()=>e.run('validateDimensions(cols,rows)'),/1,048,576|4096|4,096/);
+  }
 });

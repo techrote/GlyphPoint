@@ -7,7 +7,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 // Exercise the module embedded in the deliverable, not a parallel implementation.
-const app = fs.readFileSync(process.env.GLYPHPOINT_APP || path.join(__dirname,'..','GlyphPoint-v1a-layout-fixed.html'),'utf8');
+const app = fs.readFileSync(process.env.GLYPHPOINT_APP || path.join(__dirname,'..','GlyphPoint-RC.html'),'utf8');
 const moduleSource = app.match(/\/\* Unicode cells and bounded, inert HTML interchange\.[\s\S]*?if \(typeof module !== 'undefined' && module\.exports\) module\.exports = GPInterchange;/)?.[0];
 assert.ok(moduleSource, 'Build the standalone editor before running interchange tests.');
 function load(overrides = {}) {

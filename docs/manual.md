@@ -1,8 +1,8 @@
 # GlyphPoint instruction manual
 
-This manual describes the maintained **`GlyphPoint-v1a-layout-fixed.html`** editor. It is a single-file application for editing coloured Unicode grids with a mouse, keyboard, or touch pointer. It includes automatic local recovery, individual cell colours, an embedded font, and editable/project and image exports. The earlier `GlyphPoint-v1a.html` and `GlyphPoint-v04a.html` files are historical versions and may behave differently.
+This manual describes the maintained **`GlyphPoint-RC.html`** editor. It is a single-file application for editing coloured Unicode grids with a mouse, keyboard, or touch pointer. It includes automatic local recovery, individual cell colours, an embedded font, and editable/project and image exports. The earlier `GlyphPoint-v1a.html` and `GlyphPoint-v04a.html` files are historical versions and may behave differently.
 
-Start with the [new-user guide](new-user-guide.md) if you want a short worked exercise. This manual is the reference for the available controls and their interactions. Implementation details live in the [maintained application source](../GlyphPoint-v1a-layout-fixed.html); UI labels in this manual correspond to that file. The [repository overview](../readme.md) provides the documentation index. For development, follow [AGENTS.md](../AGENTS.md), the [agent/RAG reference](../RAG.md), and the [project format reference](project-format.md).
+Start with the [new-user guide](new-user-guide.md) if you want a short worked exercise. This manual is the reference for the available controls and their interactions. Implementation details live in the [maintained application source](../GlyphPoint-RC.html); UI labels in this manual correspond to that file. The [repository overview](../readme.md) provides the documentation index. For development, follow [AGENTS.md](../AGENTS.md), the [agent/RAG reference](../RAG.md), and the [project format reference](project-format.md).
 
 ## Contents
 
@@ -29,7 +29,7 @@ Start with the [new-user guide](new-user-guide.md) if you want a short worked ex
 
 ## Opening the editor
 
-Download the repository ZIP and extract it, or download the raw `GlyphPoint-v1a-layout-fixed.html` file from GitHub. Open that file in a desktop browser. A GitHub source-code page is a file viewer, not the running editor.
+Download the repository ZIP and extract it, or download the raw `GlyphPoint-RC.html` file from GitHub. Open that file in a desktop browser. A GitHub source-code page is a file viewer, not the running editor.
 
 The application contains its own JavaScript, CSS, and interface. Drawing and file downloads do not require a server. There is no application account, cloud synchronisation, or remote project-storage service in the editor.
 
@@ -45,7 +45,7 @@ py -m http.server 8000 --bind 127.0.0.1
 python3 -m http.server 8000 --bind 127.0.0.1
 ```
 
-Open `http://127.0.0.1:8000/GlyphPoint-v1a-layout-fixed.html`. A local server provides a consistent origin for browser storage and can help with clipboard permissions. Recovery data stays in the browser; the Python server does not receive or save your artwork. Stop it with `Ctrl+C` in the terminal.
+Open `http://127.0.0.1:8000/GlyphPoint-RC.html`. A local server provides a consistent origin for browser storage and can help with clipboard permissions. Recovery data stays in the browser; the Python server does not receive or save your artwork. Stop it with `Ctrl+C` in the terminal.
 
 Use the maintained filename and launch address consistently. Recovery and preferences belong to the browser's storage context: a downloaded `file:` copy, a different localhost port, another browser/profile, and a private-browsing window may not share them. The recovery status reports when storage is unavailable. Use saved JSON files to transfer projects between contexts.
 
@@ -355,7 +355,7 @@ Resize uses nearest-cell sampling. Increasing the size repeats source cells; dec
 
 Skew is applied after resizing, first horizontally and then vertically. Each angle accepts finite values between **−89° and +89°**. The operation fills each destination cell by sampling backward into the source, which avoids the holes and competing writes caused by pushing source cells forward. Sampling still discretises a geometric shape: enlarging can repeat cells and reducing can lose detail.
 
-**Expand to fit** preserves the transformed bounding rectangle and adds blanks around its slanted edges. The final dimensions can be larger than the resize values you entered. **Reject overflow** leaves the document unchanged when the shear would extend outside those values. **Clip to resized field** explicitly trims the result and reports it. Large angles can require a field beyond the 512-cell axis/65,536-cell area limits; those results are rejected before replacing the document.
+**Expand to fit** preserves the transformed bounding rectangle and adds blanks around its slanted edges. The final dimensions can be larger than the resize values you entered. **Reject overflow** leaves the document unchanged when the shear would extend outside those values. **Clip to resized field** explicitly trims the result and reports it. Large angles can require a field beyond the 4,096-cell axis/1,048,576-cell area limits; those results are rejected before replacing the document.
 
 Resize/Skew shows progress while its worker calculates. **Cancel operation** discards the candidate result. The editor disables drawing while the job runs and commits a completed result as one undoable edit. Worker-restricted browsers use the same calculation in yielding batches. Rendering and this computation no longer require a DOM element for every cell.
 
@@ -479,7 +479,7 @@ Use identifiable names and keep versions before major changes, for example `harb
 
 Edits schedule a checkpoint in this browser's IndexedDB storage. The usual delay is **750 milliseconds after the latest edit**, with a **five-second maximum scheduling interval** during continuous editing. The status bar distinguishes Recovery pending, Saving recovery, Recovery saved, and Recovery unavailable. A successful checkpoint does not clear the unsaved-project marker: recovery and file saving serve different purposes.
 
-The archive keeps the latest checkpoint for each tab/document session, up to **12 documents** and **32 MiB of total serialized project payloads**, with a **16 MiB per-checkpoint limit**. Older entries are evicted as needed when a new checkpoint is successfully stored. This is a bounded recovery archive, not a sequence of every edit or an indefinite version history. Multiple tabs use separate identifiers, even when their displayed filenames match.
+The archive keeps the latest checkpoint for each tab/document session, up to **12 documents** and **32 MiB of stored payloads**, with a **16 MiB per-checkpoint limit**. Documents larger than 65,536 cells use lossless run-length encoding in recovery; detailed high-entropy artwork may still exceed that limit and produce a visible recovery error. Older entries are evicted as needed when a new checkpoint is successfully stored. This is a bounded recovery archive, not a sequence of every edit or an indefinite version history. Multiple tabs use separate identifiers, even when their displayed filenames match.
 
 To restore a checkpoint:
 
@@ -507,7 +507,7 @@ Opening project JSON starts from its saved state without an unsaved marker. Text
 
 Use the title-bar arrows or **Ctrl+Z** / **Ctrl+Y**; **Ctrl+Shift+Z** also redoes. Command works as the modifier on platforms that use it. Undo restores a previous document-edit snapshot; redo reapplies an undone edit until a new edit starts another history path. Completed fill/resize jobs, colour applications, compound drawing gestures, and transforms are undoable document edits.
 
-History is bounded to **60 snapshots** and a combined undo/redo budget of **262,144 retained cells**; larger fields retain fewer steps. History exists only in the current page and is not stored in JSON, HTML, or recovery checkpoints. Recovery restores artwork and settings, not the sequence of undo steps. Keep named project versions for durable milestones.
+History is bounded to **60 snapshots** and a combined undo/redo budget of **2,097,152 retained cells**; larger fields retain fewer steps. History exists only in the current page and is not stored in JSON, HTML, or recovery checkpoints. Recovery restores artwork and settings, not the sequence of undo steps. Keep named project versions for durable milestones.
 
 ## File formats and exports
 
@@ -698,8 +698,8 @@ Use a current browser with Canvas 2D and Unicode grapheme segmentation. The runt
 
 | Area | Practical boundary |
 | --- | --- |
-| Field dimensions | Whole values from `1` to `512` on each axis, with at most **65,536 cells** overall. Both constraints must hold. |
-| Import file size | At most **16 MiB** per imported project, palette, text, or HTML file. HTML also has node, nesting, style, rule, and selector-work budgets. |
+| Field dimensions | Whole values from `1` to `4,096` on each axis, with at most **1,048,576 cells** overall. Both constraints must hold. |
+| Import file size | At most **256 MiB** for JSON projects; **16 MiB** for palette, text and HTML files. HTML also has node, nesting, style, rule, and selector-work budgets. |
 | Palette | At most **4,096 entries including reserved space**, leaving at most **4,095 other graphemes**. Space cannot be removed or renamed. |
 | Colours | Palette/field defaults with individual opaque six-digit hex foreground and background overrides. Imported CSS alpha is flattened onto the effective background. |
 | Glyphs | One printable extended grapheme per cell, up to **32 Unicode code points**; controls, lone surrogates, and overlong clusters are rejected. |
@@ -708,7 +708,7 @@ Use a current browser with Canvas 2D and Unicode grapheme segmentation. The runt
 | Shape width | Values `1`–`8`. |
 | Zoom | 25%–800%, in 25-percentage-point increments. |
 | Labels | Represents labels have an 80-character storage limit. |
-| Undo/redo | At most 60 snapshots and 262,144 retained cells across undo/redo; session only. |
+| Undo/redo | At most 60 snapshots and 2,097,152 retained cells across undo/redo; session only. |
 | Recovery | Up to 12 latest document-session checkpoints, 32 MiB serialized payload total, 16 MiB per entry; browser-local and subject to storage availability. |
 | File saving | Native writable-file saving when exposed by the browser; explicit download fallback otherwise. The API is detected rather than assumed from the operating system. |
 | Clipboard | System access depends on browser permissions/context. Internal styled copying remains session-local; Readable text provides a manual-copy alternative. |
@@ -716,7 +716,7 @@ Use a current browser with Canvas 2D and Unicode grapheme segmentation. The runt
 | Rendering | Viewport-based Canvas 2D with bounded frame work and separate overlays; model/history still retain the entire document. |
 | Long calculations | Fill and Resize/Skew use a worker or cooperative fallback, with progress, cancellation, and one atomic completed edit. File parsing, JSON serialization, and some smaller edits still run on the main thread. |
 
-For example, `256 × 256` and `512 × 128` fields each contain 65,536 cells and fit the area budget. A `512 × 512` field exceeds that budget even though each axis is allowed. Expand-to-fit operations also obey both limits: they reject a candidate that cannot fit instead of silently clipping it.
+For example, `1024 × 1024` and `4096 × 256` fields each contain 1,048,576 cells and fit the area budget; `2048 × 2048` and `4096 × 4096` exceed it. Memory use grows with every cell and each retained Undo snapshot, even though the Canvas viewport only paints visible cells. Expand-to-fit operations also obey both limits: they reject a candidate that cannot fit instead of silently clipping it.
 
 Combining sequences and emoji can be stored as complete cells, but storage support does not guarantee a particular font has the glyph. Wide glyphs are fitted to the fixed cell box; they do not claim two terminal columns. Square pixels changes cell proportions, not Unicode segmentation. Use the embedded font for predictable covered characters and PNG for a fixed result across viewers.
 
@@ -748,7 +748,7 @@ Automated checks provide evidence for the combinations actually exercised; the [
 | A glyph appears as a box or is unusually small | The selected/fallback font may lack it, or fitting a wide grapheme requires scaling. Try the embedded font or an installed font with appropriate coverage; use PNG to share the displayed result. |
 | Plain-text export looks different elsewhere | Text has no colours/styles and the viewer may wrap lines or use a proportional font. Use a monospaced font, disable wrapping, or share HTML instead. |
 | Opening text changes a final newline | One trailing line terminator is removed; additional blank rows are retained. Use JSON if another program trims whitespace or changes line endings. |
-| A resize or import is rejected | Check the 512-cell axis limit, 65,536-cell area budget, 16 MiB file limit, and project structure. The current document should remain intact. |
+| A resize or import is rejected | Check the 4,096-cell axis limit, 1,048,576-cell area budget, 256 MiB project or 16 MiB text/HTML/palette input limit, and project structure. The current document should remain intact. |
 | Saved files cannot be found | For direct Save, check the destination chosen in the picker. For downloads, inspect the browser download list and any numbered duplicate filenames. |
 | Save leaves the asterisk visible | Download completion cannot be verified, or a newer edit occurred during a direct save. Confirm the JSON copy, or save the newest revision to the chosen file. |
 | Save project as is disabled | This browser/context does not expose the native writable-file picker. Use **Download project JSON**. |

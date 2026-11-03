@@ -2,17 +2,17 @@
 
 **An offline Unicode drawing editor with local recovery, individual cell colours, and a Canvas 2D workspace.** Draw with characters, compose text, arrange selections, and share editable projects or fixed images. One downloaded HTML file includes the editor and its default font; no account, server, or runtime package installation is required.
 
-The current development version is **2.0.0-rc.1**, using the **v3 project format**. The maintained filename remains **[GlyphPoint-v1a-layout-fixed.html](GlyphPoint-v1a-layout-fixed.html)** so existing links keep working. Release preparation and platform qualification are documented separately; this version label does not mean a release has been published or every CI combination has passed.
+The current development version is **2.0.0-rc.1**, using the **v3 project format**. The maintained filename remains **[GlyphPoint-RC.html](GlyphPoint-RC.html)** so existing links keep working. Release preparation and platform qualification are documented separately; this version label does not mean a release has been published or every CI combination has passed.
 
 ## Start here
 
 1. Choose **Code → Download ZIP** in GitHub and extract it, or download the maintained HTML file using **Download raw file**.
-2. Open `GlyphPoint-v1a-layout-fixed.html` in a current browser. GitHub's source viewer does not run the editor.
+2. Open `GlyphPoint-RC.html` in a current browser. GitHub's source viewer does not run the editor.
 3. Choose a palette glyph, select Pencil, and draw. Use the secondary mouse button or **Use secondary glyph** for the other glyph slot. **Focus field** enables keyboard editing, and **Pan field** lets a touch/pointer drag scroll without painting.
 4. Watch the recovery status after an edit. **Recovery saved** confirms a local checkpoint; **Recovery** lets you explicitly restore one after reloading.
 5. Choose **File → Save project** for a portable editing copy. Supported browsers offer a native file destination; other browsers request a download. **Download project JSON…** always requests a downloadable copy. Keep and verify the file.
 
-For an optional consistent localhost origin, run `python3 -m http.server 8000 --bind 127.0.0.1` in the repository and open [the editor on localhost](http://127.0.0.1:8000/GlyphPoint-v1a-layout-fixed.html). On Windows, use `py -m http.server 8000 --bind 127.0.0.1`. The server serves the editor; it does not receive your artwork.
+For an optional consistent localhost origin, run `python3 -m http.server 8000 --bind 127.0.0.1` in the repository and open [the editor on localhost](http://127.0.0.1:8000/GlyphPoint-RC.html). On Windows, use `py -m http.server 8000 --bind 127.0.0.1`. The server serves the editor; it does not receive your artwork.
 
 Follow the [new-user guide](docs/new-user-guide.md) for a worked first drawing, saving, and recovery exercise. The [manual](docs/manual.md) describes all controls and their interactions.
 
@@ -34,7 +34,7 @@ New artwork uses embedded **DejaVu Sans Mono** regular, bold, oblique, and bold-
 
 ## Saving and recovery
 
-Recovery keeps the latest checkpoint for each tab/document session in this browser's storage: up to **12 entries**, **32 MiB of serialized project payloads in total**, and **16 MiB per entry**. It normally schedules after 750 ms without another edit, or within five seconds during continuous editing. Old entries can be evicted; clearing site data, changing browser/profile/address, private browsing, or storage errors can affect availability. Restore a checkpoint explicitly through **Recovery** and retain JSON files for portable copies.
+Recovery keeps the latest checkpoint for each tab/document session in this browser's storage: up to **12 entries**, **32 MiB of stored payloads in total**, and **16 MiB per entry**. Large repetitive canvases use lossless run-length encoding in the recovery archive; highly detailed projects can still exceed that archive budget and require a separate saved JSON file. It normally schedules after 750 ms without another edit, or within five seconds during continuous editing. Old entries can be evicted; clearing site data, changing browser/profile/address, private browsing, or storage errors can affect availability. Restore a checkpoint explicitly through **Recovery** and retain JSON files for portable copies.
 
 A direct Save clears the unsaved marker only after a successful file write of the current revision. A download request leaves the marker in place because the editor cannot verify that the file was kept. The first direct Save chooses a destination; opening a project does not silently authorize overwriting its source file. Recovery is separate from file saving and does not retain session Undo history.
 
@@ -60,12 +60,13 @@ A direct Save clears the unsaved marker only after a successful file write of th
 
 | Path | Role |
 | --- | --- |
-| `GlyphPoint-v1a-layout-fixed.html` | Maintained, generated, self-contained application. End users open this file. |
+| `GlyphPoint-RC.html` | **Canonical**, generated, self-contained application. End users open this file. |
+| `GlyphPoint-v1a-layout-fixed.html` | Lightweight compatibility launcher redirecting to `GlyphPoint-RC.html`; it is **not** a second maintained editor. |
 | `src/` | Editable HTML template and runtime modules assembled into the maintained application. |
 | `assets/fonts/` | Embedded font CSS, provenance/hashes, and independent font license notice. |
 | `GlyphPoint-v1a.html`, `GlyphPoint-v04a.html` | Historical snapshots; current fixes and v3 features do not apply to them. |
 
-Fields allow **1–512 cells per axis** and **65,536 cells overall**. Palettes allow **4,096 entries including reserved space**. Imports are limited to **16 MiB**; foreign HTML has additional node/style complexity budgets. These limits bound work and allocation; they do not promise identical performance on every device.
+Fields allow **1–4,096 cells per axis** and **1,048,576 cells overall** (for example 1024×1024 or 4096×256, not 4096×4096). The earlier 65,536-cell limit belonged to the original dense/DOM implementation. Palettes allow **4,096 entries including reserved space**. Project JSON imports are limited to **256 MiB**; palette, text, and HTML imports remain limited to **16 MiB**; foreign HTML has additional node/style complexity budgets. These limits bound work and allocation; they do not promise identical performance on every device.
 
 The writer produces `glyphpoint-v3`. Legacy v1/v2 projects are migrated to retain their original palette-based appearance. New grapheme and individual-colour features require the maintained editor. Glyph storage support does not guarantee font coverage or identical emoji rendering. Foreign HTML imports a bounded safe CSS subset rather than arbitrary page layout or active content.
 

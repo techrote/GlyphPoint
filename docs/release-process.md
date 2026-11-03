@@ -17,7 +17,7 @@ npm run release:package
 
 | Artifact | Contents |
 | --- | --- |
-| `GlyphPoint-2.0.0-rc.1.zip` | Repository source, the maintained standalone application, documentation, tests, and font notices. Open `GlyphPoint-v1a-layout-fixed.html` after extraction. Historical HTML snapshots retain their existing filenames. |
+| `GlyphPoint-2.0.0-rc.1.zip` | Repository source, the maintained standalone application, documentation, tests, and font notices. Open `GlyphPoint-RC.html` after extraction. Historical HTML snapshots retain their existing filenames. |
 | `GlyphPoint-2.0.0-rc.1.zip.sha256` | SHA-256 checksum of the ZIP. |
 | `release-manifest.json` | Package version, source commit, whether the working tree contained changes, license status, application entry point, and the SHA-256/size of each packaged file. |
 

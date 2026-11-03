@@ -4,7 +4,7 @@
 
 Read [readme.md](readme.md), the relevant [RAG](RAG.md) chunks, and the affected [manual](docs/manual.md) section before changing behaviour. Current user instructions and repository controls take precedence over this guidance. Inspect the branch, worktree status, accepted source, and live PRs before integration; preserve unrelated work.
 
-The maintained deliverable is **`GlyphPoint-v1a-layout-fixed.html`**, a generated, offline, self-contained application. Edit **`src/app.html`**, the modules in **`src/`**, and relevant **`assets/fonts/`** inputs, then run **`npm run build`**. Commit source and generated output together. `npm run check` rejects a stale build. Do not make hand edits only to the generated HTML.
+The maintained deliverable is **`GlyphPoint-RC.html`**, a generated, offline, self-contained application. Edit **`src/app.html`**, the modules in **`src/`**, and relevant **`assets/fonts/`** inputs, then run **`npm run build`**. Commit source and generated output together. `npm run check` rejects a stale build. Do not make hand edits only to the generated HTML.
 
 `GlyphPoint-v1a.html` and `GlyphPoint-v04a.html` are historical snapshots. Do not propagate routine repairs into them or introduce another competing entry point unless explicitly requested. The original November 2026 audit describes an earlier revision; use current source, tests, and the [follow-up record](docs/quality-followup-2026-11-03.md) for present behaviour.
 
@@ -22,7 +22,7 @@ The maintained deliverable is **`GlyphPoint-v1a-layout-fixed.html`**, a generate
 
 - Any edit to saved document content must mark dirty and schedule recovery. A compound gesture/job should have one meaningful undo step. Pure navigation, layout, and future brush preferences need not add history.
 - Worker/cooperative jobs commit only if not cancelled and their captured document revision is still current. Preserve progress/cancellation, input guards, and atomic installation. Protect imports and asynchronous clipboard reads against superseded documents or edits.
-- Keep recovery browser-local, explicit to restore, and bounded: latest checkpoint per tab/document, 12 entries, 32 MiB serialized archive payload, 16 MiB per record, and bounded pending writes. Preserve atomic write/eviction and explicit storage/quota/queue errors. Never describe recovery as cloud sync, permanent backup, or persistent Undo history.
+- Keep recovery browser-local, explicit to restore, and bounded: latest checkpoint per tab/document, 12 entries, 32 MiB serialized archive payload, 16 MiB per encoded record, large-field lossless RLE, and bounded pending writes. Preserve atomic write/eviction and explicit storage/quota/queue errors. Never describe recovery as cloud sync, permanent backup, or persistent Undo history.
 - Direct Save clears dirty only after a successful completed write of the unchanged captured revision. Downloads cannot verify completion and remain dirty. Do not reuse a file handle after New/Open or claim a cancelled/failed write succeeded.
 - Keep imported HTML/CSS inert. Never append imported nodes or stylesheets, execute event/script content, or fetch imported resources. Copy only validated data. Preserve parser/selector-work budgets and safe export/data-block escaping.
 - Retain bundled-font provenance, hashes, and license notices in the repository and applicable exports. A third-party font license does not license GlyphPoint itself.

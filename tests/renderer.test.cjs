@@ -7,7 +7,7 @@ const vm = require('node:vm');
 const {test} = require('node:test');
 
 // Exercise exactly the renderer embedded in the shipped offline application.
-const appPath = process.env.GLYPHPOINT_APP || path.join(__dirname, '..', 'GlyphPoint-v1a-layout-fixed.html');
+const appPath = process.env.GLYPHPOINT_APP || path.join(__dirname, '..', 'GlyphPoint-RC.html');
 const html = fs.readFileSync(appPath, 'utf8');
 const source = html.match(/\/\* GP_RENDERER_BEGIN \*\/[\s\S]*?\/\* GP_RENDERER_END \*\//)?.[0];
 assert.ok(source, 'Build the maintained HTML before running renderer tests.');
@@ -162,7 +162,9 @@ test('PNG allocation budgets accept the whole largest native field and reject un
   assert.deepEqual(plain(rendererModule.exportDimensions(512, 128, 16, 16)), {width: 8192, height: 2048, scale: 1});
   assert.deepEqual(plain(rendererModule.exportDimensions(3, 2, 8.43, 16, 2)), {width: 51, height: 64, scale: 2});
   assert.throws(() => rendererModule.exportDimensions(256, 256, 16, 16, 2), /32 megapixel/);
-  assert.throws(() => rendererModule.exportDimensions(512, 512, 16, 16), /65,536/);
+  assert.throws(() => rendererModule.exportDimensions(512, 512, 16, 16), /32 megapixel/);
+  assert.deepEqual(plain(rendererModule.exportDimensions(1024,1024,1,1)),{width:1024,height:1024,scale:1});
+  assert.throws(() => rendererModule.exportDimensions(4096,257,1,1), /1,048,576/);
   assert.throws(() => rendererModule.exportDimensions(1, 1, NaN, 16), /finite/);
   assert.throws(() => rendererModule.exportDimensions(1, 1, 8, 16, Infinity), /finite/);
 });

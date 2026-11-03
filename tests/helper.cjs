@@ -174,7 +174,7 @@ function createEditor(options = {}) {
   };
   sandbox.window = sandbox;
   const context = vm.createContext(sandbox);
-  const filename = options.filename || process.env.GLYPHPOINT_APP || path.join(__dirname, '..', 'GlyphPoint-v1a-layout-fixed.html');
+  const filename = options.filename || process.env.GLYPHPOINT_APP || path.join(__dirname, '..', 'GlyphPoint-RC.html');
   const html = fs.readFileSync(filename, 'utf8');
   const match = html.match(/<script\b[^>]*>([\s\S]*?)<\/script>/i);
   if (!match) throw new Error(`No inline application script in ${filename}`);

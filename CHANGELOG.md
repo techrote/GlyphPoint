@@ -1,5 +1,13 @@
 # Change log
 
+## 2026-11-03 — RC canonical name and field capacity
+
+- Renamed the generated editor to `GlyphPoint-RC.html`; the previous `GlyphPoint-v1a-layout-fixed.html` is a lightweight compatibility launcher only.
+- Raised dimensions to 4,096 per axis and 1,048,576 total cells (16× the previous area budget).
+- Raised portable project JSON size to 256 MiB while keeping separate 16 MiB palette/text/HTML interchange limits.
+- Increased the Undo cell budget to 2,097,152 and added lossless RLE for large browser-local checkpoints; highly detailed artwork may still exceed the archive budget.
+
+
 ## 2.0.0-rc.1 — 2026-11-03 (release candidate; not published)
 
 This follow-up implements the requested persistence, rendering, Unicode, colour, interchange, and interaction improvements. The maintained entry point remains `GlyphPoint-v1a-layout-fixed.html`; the current project schema is `glyphpoint-v3`. Candidate packaging and draft-release tooling are present. Project-license selection and exact-commit CI qualification remain explicit release gates; the version label is not a claim that a release has been published or every configured platform has passed.

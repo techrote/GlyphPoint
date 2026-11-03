@@ -6,8 +6,8 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const deepCell = c => ({...c});
 const makeCell=(ch=' ')=>({ch,fg:'',bg:'',font:'DejaVu Sans Mono',bold:false,italic:false,underline:false});
 // Bound model allocation and retained history. Validate before replacing a document.
-const MAX_DIMENSION=512,MAX_CELLS=65536,MAX_FILE_BYTES=16*1024*1024,MAX_PALETTE=4096;
-const MAX_HISTORY=60,MAX_HISTORY_CELLS=262144;
+const MAX_DIMENSION=4096,MAX_CELLS=1048576,MAX_FILE_BYTES=256*1024*1024,SMALL_FILE_BYTES=16*1024*1024,MAX_PALETTE=4096;
+const MAX_HISTORY=60,MAX_HISTORY_CELLS=2097152;
 let importGeneration=0,documentRevision=0,documentIdentity=0,preferencesUnavailable=false;
 let renderer=null,recovery=null,fileSaver=null,activeJob=null;
 function validateDimensions(cols,rows){
@@ -266,7 +266,7 @@ async function importGlyphPaletteFile(e){
   const f=e.target.files[0];if(!f)return;e.target.value='';const generation=++importGeneration,revision=documentRevision;
   let applying=false;
   try{
-    const text=await readImportFile(f);if(!importStillCurrent(generation,revision,'the palette'))return;const d=JSON.parse(text);
+    const text=await readImportFile(f,SMALL_FILE_BYTES);if(!importStillCurrent(generation,revision,'the palette'))return;const d=JSON.parse(text);
     if(!d||!['glyphpoint-v1','glyphpoint-v2','glyphpoint-v3'].includes(d.format)||!Array.isArray(d.glyphPalette))throw Error('No compatible GlyphPoint palette found');
     if(!d.glyphPalette.length)throw Error('Palette is empty');
     const pal=normalisePalette(d.glyphPalette,d.glyphColours||{}),seen=new Set(pal.map(x=>x.glyph)),used=new Set(state.cells.map(c=>c.ch));
@@ -786,7 +786,7 @@ async function saveProject(options={}){
   }
   return result;
 }
-async function readImportFile(f){if(f.size>MAX_FILE_BYTES)throw Error('File exceeds the 16 MiB import limit.');return await f.text()}
+async function readImportFile(f,maxBytes=MAX_FILE_BYTES){if(f.size>maxBytes)throw Error(`File exceeds the ${Math.floor(maxBytes/1048576)} MiB import limit.`);return await f.text()}
 function importStillCurrent(generation,revision,source){
   if(generation!==importGeneration)return false;
   if(revision!==documentRevision){setMessage(`The document changed while reading ${source}; choose the file again to apply it.`);return false}
@@ -806,18 +806,18 @@ function installDocument(data,name){
   state.docName=name;state.cursor={x:0,y:0};state.selection=null;state.keyboardAnchor=null;state.drawing=false;state.moveSelection=null;state.drawGlyph=state.glyphPrimary;state.textAnchor=null;clearPreview();
   syncDocumentControls();rebuildGrid();savePalettePrefs();state.dirty=false;documentRevision++;recovery?.beginDocument();recovery?.touch();updateTitle();
 }
-async function importDocumentFile(e,parse,label){
+async function importDocumentFile(e,parse,label,maxBytes=MAX_FILE_BYTES){
   const f=e.target.files[0];if(!f)return;e.target.value='';const generation=++importGeneration,revision=documentRevision;
   let installing=false;
   try{
-    const text=await readImportFile(f);if(!importStillCurrent(generation,revision,'the file'))return;
+    const text=await readImportFile(f,maxBytes);if(!importStillCurrent(generation,revision,'the file'))return;
     const data=await parse(text);if(!importStillCurrent(generation,revision,'the file'))return;
     if(state.dirty&&!confirm('Discard unsaved changes and open this file?'))return;
     installing=true;installDocument(data,f.name);if(label!=='Project opened')markDirty();setMessage(label+(data.importWarning?' — '+data.importWarning:''));
   }catch(err){if(installing||generation===importGeneration&&revision===documentRevision)alert('Could not open file: '+err.message)}
 }
 function openProjectFile(e){return importDocumentFile(e,t=>normaliseProject(JSON.parse(t)),'Project opened')}
-function openTxtFile(e){return importDocumentFile(e,t=>normaliseProject({format:'glyphpoint-v3',...textDocument(t),glyphPalette:state.glyphPalette,fieldBg:state.fieldBg,square:state.square,glyphPrimary:state.glyphPrimary,glyphSecondary:state.glyphSecondary}),'Plain text imported')}
+function openTxtFile(e){return importDocumentFile(e,t=>normaliseProject({format:'glyphpoint-v3',...textDocument(t),glyphPalette:state.glyphPalette,fieldBg:state.fieldBg,square:state.square,glyphPrimary:state.glyphPrimary,glyphSecondary:state.glyphSecondary}),'Plain text imported',SMALL_FILE_BYTES)}
 function inlineColour(value){
   if(validColour(value))return value.toLowerCase();let m=/^#([0-9a-f]{3})$/i.exec(value||'');if(m)return '#'+[...m[1]].map(c=>c+c).join('').toLowerCase();
   m=/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i.exec(value||'');
@@ -830,7 +830,7 @@ function htmlDocument(text){
   const parsed=GPInterchange.parseHtml(text,{maxDimension:MAX_DIMENSION,maxCells:MAX_CELLS,maxPalette:MAX_PALETTE,safeFonts:SAFE_FONTS,defaultFont:'DejaVu Sans Mono'});
   return {...normaliseProject(parsed),importWarning:parsed.importWarning||parsed.warnings?.join('; ')||''};
 }
-function openHtmlFile(e){return importDocumentFile(e,htmlDocument,'HTML imported')}
+function openHtmlFile(e){return importDocumentFile(e,htmlDocument,'HTML imported',SMALL_FILE_BYTES)}
 function exportHtml(){
   try{
     const data=normaliseProject(projectPayload()),glyphIndex=new Map(data.glyphPalette.map((e,i)=>[e.glyph,i]));
@@ -850,7 +850,7 @@ function exportHtml(){
     const json=JSON.stringify({...data,format:'glyphpoint-v3'}).replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/&/g,'\\u0026');
     const license=BUNDLED_FONT_LICENSE.replace(/--/g,'—');
     const html=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src data:"><title>GlyphPoint export</title><style>${fonts}html,body{margin:0;background:${data.fieldBg};color:#fff}body{padding:20px}pre{display:grid;grid-template-columns:repeat(${data.cols},${cellWidth}px);width:max-content;margin:0;font:14px/${cellHeight}px "DejaVu Sans Mono",monospace;white-space:pre;font-variant-ligatures:none}pre>span{display:block;width:${cellWidth}px;height:${cellHeight}px;overflow:hidden;text-align:center;background:${data.fieldBg}}.b{font-weight:bold}.i{font-style:italic}.u{text-decoration:underline}${paletteCss}${fontCss}</style><!--${license}--></head><body><pre id="art" aria-label="GlyphPoint artwork">${lines.join('\n')}</pre><script id="glyphpoint-data" type="application/json">${json}<\/script></body></html>`;
-    if(new Blob([html]).size>MAX_FILE_BYTES)throw Error('HTML exceeds the import budget; save the project JSON or use a smaller field.');
+    if(new Blob([html]).size>SMALL_FILE_BYTES)throw Error('HTML exceeds the 16 MiB HTML export budget; save a project JSON file or use a smaller field.');
     downloadBlob(html,'text/html','glyphpoint-export.html');setMessage('HTML exported with cell colours, embedded font and editable project data.');
   }catch(err){alert('Could not export HTML: '+err.message)}
 }

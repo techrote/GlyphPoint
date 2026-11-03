@@ -5,7 +5,7 @@ const GPJobs = (() => {
   function* kernel(kind, input) {
     const {cols, rows} = input;
     const dimensions = (w,h) => {
-      if (!Number.isInteger(w)||!Number.isInteger(h)||w<1||h<1||w>512||h>512||w*h>65536) throw Error('Result exceeds the 512-cell side or 65,536-cell document limit.');
+      if (!Number.isInteger(w)||!Number.isInteger(h)||w<1||h<1||w>4096||h>4096||w*h>1048576) throw Error('Result exceeds the 4,096-cell side or 1,048,576-cell document limit.');
     };
     dimensions(cols,rows);
     if (!Array.isArray(input.cells)||input.cells.length!==cols*rows) throw Error('Invalid source cell count.');

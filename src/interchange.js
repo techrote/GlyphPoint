@@ -159,7 +159,7 @@ const GPInterchange = (() => {
   function parseHtml(text, options = {}) {
     if (typeof text !== 'string') throw new TypeError('HTML must be a string.');
     const limits = {
-      maxDimension:512,maxCells:65536,maxPalette:4096,maxFileBytes:16*1024*1024,
+      maxDimension:4096,maxCells:1048576,maxPalette:4096,maxFileBytes:16*1024*1024,
       maxNodes:200000,maxDepth:100,maxRules:512,maxSelectors:2048,
       maxStyleChars:131072,maxDeclarations:8192,maxSelectorChecks:1000000,
       ...options,

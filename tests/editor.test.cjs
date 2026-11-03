@@ -408,9 +408,9 @@ test('history enforces both entry and aggregate cell budgets across undo and red
   e.run('for(let i=0;i<40;i++){state.docName=`large-${i}`;snapshot()}state.docName="working";undo()');
   assert.equal(e.state.docName, 'large-39');
   const retained = e.run('[...state.history,...state.future].reduce((n,s)=>n+s.cells.length,0)');
-  assert.ok(retained <= 262144);
+  assert.ok(retained <= 2097152);
   assert.ok(e.state.history.length + e.state.future.length <= 60);
   e.run('redo()');
   assert.equal(e.state.docName, 'working');
-  assert.ok(e.run('[...state.history,...state.future].reduce((n,s)=>n+s.cells.length,0)') <= 262144);
+  assert.ok(e.run('[...state.history,...state.future].reduce((n,s)=>n+s.cells.length,0)') <= 2097152);
 });

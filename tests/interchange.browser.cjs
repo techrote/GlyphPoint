@@ -5,7 +5,7 @@ const path = require('node:path');
 const {pathToFileURL} = require('node:url');
 const playwright = require('playwright');
 
-const appURL = pathToFileURL(path.resolve(process.env.GLYPHPOINT_APP || path.join(__dirname,'..','GlyphPoint-v1a-layout-fixed.html'))).href;
+const appURL = pathToFileURL(path.resolve(process.env.GLYPHPOINT_APP || path.join(__dirname,'..','GlyphPoint-RC.html'))).href;
 const browserNames = process.argv.slice(2).length ? process.argv.slice(2) : ['chromium','firefox','webkit'];
 
 async function runBrowser(browserName) {

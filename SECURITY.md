@@ -1,6 +1,6 @@
 # Security and data handling
 
-This document describes the maintained **`GlyphPoint-v1a-layout-fixed.html`** editor generated from `src/`. Earlier HTML snapshots are historical and do not include the current boundaries or fixes. Use the maintained build for artwork from other sources.
+This document describes the maintained **`GlyphPoint-RC.html`** editor generated from `src/`. Earlier HTML snapshots are historical and do not include the current boundaries or fixes. Use the maintained build for artwork from other sources.
 
 ## Data location and external access
 
@@ -20,7 +20,7 @@ Recovery is local, not encrypted by a separate GlyphPoint encryption layer, and 
 
 ## Bounded and transactional recovery
 
-Edits schedule an automatic checkpoint after a 750 ms pause, with a five-second maximum scheduling interval during continuous editing. The archive retains the latest record for each unique tab/document session, bounded to **12 entries**, **32 MiB of serialized project payloads**, and **16 MiB per entry**. Outstanding serialized writes are also bounded rather than allowed to grow without limit while storage is stalled.
+Edits schedule an automatic checkpoint after a 750 ms pause, with a five-second maximum scheduling interval during continuous editing. The archive retains the latest record for each unique tab/document session, bounded to **12 entries**, **32 MiB of serialized project payloads**, and **16 MiB per entry**. Large mostly repetitive fields use lossless run-length encoding in the local recovery archive; high-entropy fields can still exceed its budget. Outstanding serialized writes are also bounded rather than allowed to grow without limit while storage is stalled.
 
 Archive replacement and any needed oldest-entry eviction share an IndexedDB transaction. Failed/quota-aborted writes do not delete previously stored checkpoints. Independent session/document identities and sequence checks prevent a stale write from silently replacing a newer checkpoint for that identity. Restored data is validated before installation. Recovery is selected explicitly; the application does not silently install an archived document at startup.
 
@@ -34,7 +34,7 @@ Fill and Resize/Skew calculate a candidate in a worker, or in yielding batches w
 
 ## Imported data is untrusted
 
-File readers enforce the **16 MiB** limit before parsing. Project normalization validates dimensions, exact cell counts, printable grapheme limits, fonts, six-digit colours, palette uniqueness/capacity, and relevant schema types. Field dimensions are at most 512 per axis with 65,536 cells overall. A failed candidate leaves the live document/history intact. Text validation uses streamed grapheme iteration so an oversized row can be rejected without allocating every segmented character first.
+Project file readers enforce **256 MiB**; text/palette/HTML readers enforce **16 MiB** before parsing. Project normalization validates dimensions, exact cell counts, printable grapheme limits, fonts, six-digit colours, palette uniqueness/capacity, and relevant schema types. Field dimensions are at most 4,096 per axis with 1,048,576 cells overall. A failed candidate leaves the live document/history intact. Text validation uses streamed grapheme iteration so an oversized row can be rejected without allocating every segmented character first.
 
 Legacy v1/v2 migration retains original palette-based appearance rather than activating old ignored cell overrides. v3 individual foreground/background values must pass the current colour validator. Reserved space remains available even when the palette reaches capacity.
 

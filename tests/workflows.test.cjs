@@ -31,7 +31,7 @@ test('default paste expands and undo restores dimensions, content and complete s
 test('reject and over-budget expansion preserve content and history atomically',async()=>{
   const e=createEditor();e.run(`newDocument(2,1,false);state.edgePolicy='reject';state.selection={type:'rect',x:1,y:0,w:1,h:1};state.clipboard={w:3,h:1,map:[['2,0',makeCell('Z')]]}`);
   const before=plain(e.run('captureDocument()')),history=e.state.history.length;await e.run('pasteSelection()');assert.deepEqual(plain(e.run('captureDocument()')),before);assert.equal(e.state.history.length,history);
-  e.run(`state.edgePolicy='expand';state.clipboard.w=513`);await e.run('pasteSelection()');assert.deepEqual(plain(e.run('captureDocument()')),before);assert.equal(e.state.history.length,history);
+  e.run(`state.edgePolicy='expand';state.clipboard.w=4097`);await e.run('pasteSelection()');assert.deepEqual(plain(e.run('captureDocument()')),before);assert.equal(e.state.history.length,history);
 });
 
 test('moving past top-left expands and shifts unrelated artwork without loss',()=>{

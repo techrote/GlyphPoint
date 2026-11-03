@@ -33,6 +33,50 @@ const GPRecovery = (() => {
     };
   }
 
+  // Large sparse-ish documents can be orders of magnitude larger as JSON than
+  // their actual artwork. Use lossless runs only for browser-local checkpoints;
+  // portable JSON exports keep the public v3 schema unchanged.
+  const RECOVERY_RLE_MIN_CELLS = 65537;
+  const RECOVERY_MAX_CELLS = 1048576;
+  function equivalentCells(a, b) {
+    return a.ch === b.ch && a.fg === b.fg && a.bg === b.bg && a.font === b.font &&
+      a.bold === b.bold && a.italic === b.italic && a.underline === b.underline;
+  }
+  function serializeCheckpoint(project) {
+    const cells = project.cells;
+    if (!Array.isArray(cells) || cells.length > RECOVERY_MAX_CELLS) throw failure('RecoveryDataError', 'Invalid checkpoint cell count.');
+    if (cells.length < RECOVERY_RLE_MIN_CELLS) return { encoding: 'json', payload: JSON.stringify(project) };
+    const runs = [];
+    for (let i = 0; i < cells.length;) {
+      const current = cells[i];
+      let next = i + 1;
+      while (next < cells.length && equivalentCells(current, cells[next])) next++;
+      runs.push([next - i, current]);
+      i = next;
+    }
+    const packed = { ...project, cells: undefined, cellsRleV1: runs };
+    return { encoding: 'cell-rle-v1', payload: JSON.stringify(packed) };
+  }
+  function deserializeCheckpoint(record) {
+    const data = JSON.parse(record.payload);
+    if (record.encoding === undefined || record.encoding === 'json') return data;
+    if (record.encoding !== 'cell-rle-v1') throw failure('RecoveryDataError', 'Unsupported recovery checkpoint encoding.');
+    const expected = data.cols * data.rows;
+    if (!Number.isSafeInteger(data.cols) || !Number.isSafeInteger(data.rows) || data.cols < 1 || data.rows < 1 || expected < 1 || expected > RECOVERY_MAX_CELLS || !Array.isArray(data.cellsRleV1))
+      throw failure('RecoveryDataError', 'Invalid compressed checkpoint dimensions or runs.');
+    const cells = new Array(expected);
+    let cursor = 0;
+    for (const run of data.cellsRleV1) {
+      if (!Array.isArray(run) || run.length !== 2 || !Number.isSafeInteger(run[0]) || run[0] < 1 || cursor + run[0] > expected || !run[1] || typeof run[1] !== 'object')
+        throw failure('RecoveryDataError', 'Malformed compressed recovery run.');
+      for (let i = 0; i < run[0]; i++) cells[cursor++] = { ...run[1] };
+    }
+    if (cursor !== expected) throw failure('RecoveryDataError', 'Compressed recovery runs do not fill the field.');
+    delete data.cellsRleV1;
+    data.cells = cells;
+    return data;
+  }
+
   function identifier() {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
     if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
@@ -299,12 +343,12 @@ const GPRecovery = (() => {
           // can flush, replace state, then beginDocument without changing this job.
           const project = options.capture();
           options.validate(project);
-          const payload = JSON.stringify(project);
+          const { payload, encoding } = serializeCheckpoint(project);
           if (typeof payload !== 'string') throw failure('RecoveryDataError', 'The current project cannot be serialized.');
           const record = {
             format: 'glyphpoint-recovery-v1', id: context.id, sessionId, documentId: context.documentId,
             name: documentName(options.getName ? options.getName() : 'untitled'),
-            updatedAt: now(), sequence: context.sequence, bytes: byteLength(payload), payload,
+            updatedAt: now(), sequence: context.sequence, bytes: byteLength(payload), payload, encoding,
             cols: project.cols, rows: project.rows,
           };
           planRetention([], record, limits);
@@ -368,7 +412,7 @@ const GPRecovery = (() => {
           if (record.format !== 'glyphpoint-recovery-v1' || record.id !== id || bytes > limits.maxRecordBytes || record.bytes !== bytes) {
             throw failure('RecoveryDataError', 'This recovery checkpoint is damaged or exceeds the project limit.');
           }
-          const project = options.validate(JSON.parse(record.payload));
+          const project = options.validate(deserializeCheckpoint(record));
           return { project, name: documentName(record.name), updatedAt: record.updatedAt, id };
         } catch (error) { reportError(error, 'read'); throw error; }
       },

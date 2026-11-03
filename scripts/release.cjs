@@ -10,7 +10,7 @@ execFileSync(process.execPath,[path.join(__dirname,'build.cjs'),'--check'],{cwd:
 const hash=data=>crypto.createHash('sha256').update(data).digest('hex');
 const git=(...args)=>execFileSync('git',args,{cwd:root,encoding:'utf8'}).trim();
 const files=[...new Set(execFileSync('git',['ls-files','--cached','-z'],{cwd:root,encoding:'utf8'}).split('\0').filter(Boolean))].sort();
-for(const required of ['GlyphPoint-v1a-layout-fixed.html','src/app.html','src/app.js','src/workflows.js','src/recovery.js','src/renderer.js','src/interchange.js','src/jobs.js','assets/fonts/fonts.css','assets/fonts/LICENSE-DejaVu.txt','scripts/build.cjs','scripts/release.cjs']){
+for(const required of ['GlyphPoint-RC.html','src/app.html','src/app.js','src/workflows.js','src/recovery.js','src/renderer.js','src/interchange.js','src/jobs.js','assets/fonts/fonts.css','assets/fonts/LICENSE-DejaVu.txt','scripts/build.cjs','scripts/release.cjs']){
   if(!files.includes(required))throw Error('Stage all required release source files before packaging: missing '+required);
 }
 const records=files.filter(file=>!file.startsWith('dist/')).map(file=>{
@@ -21,7 +21,7 @@ const records=files.filter(file=>!file.startsWith('dist/')).map(file=>{
   if(!stat.isFile()||stat.isSymbolicLink())throw Error('Only regular tracked files can be packaged: '+file);
   return {name:file,data:fs.readFileSync(source)};
 });
-const manifest={version,sourceCommit:git('rev-parse','HEAD'),workingTreeDirty:git('status','--porcelain')!=='',license:records.some(record=>record.name==='LICENSE')?'See LICENSE':'Owner license selection pending',entryPoint:'GlyphPoint-v1a-layout-fixed.html',files:records.map(({name,data})=>({path:name,bytes:data.length,sha256:hash(data)}))};
+const manifest={version,sourceCommit:git('rev-parse','HEAD'),workingTreeDirty:git('status','--porcelain')!=='',license:records.some(record=>record.name==='LICENSE')?'See LICENSE':'Owner license selection pending',entryPoint:'GlyphPoint-RC.html',files:records.map(({name,data})=>({path:name,bytes:data.length,sha256:hash(data)}))};
 records.push({name:'RELEASE-MANIFEST.json',data:Buffer.from(JSON.stringify(manifest,null,2)+'\n')});
 // A fixed DOS timestamp makes repeat packages byte-for-byte reproducible.
 const table=Array.from({length:256},(_,n)=>{for(let k=0;k<8;k++)n=n&1?0xedb88320^(n>>>1):n>>>1;return n>>>0});

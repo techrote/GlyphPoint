@@ -111,7 +111,7 @@ function saverFixture(options = {}) {
 }
 
 test('recovery module is embedded exactly in the maintained standalone application', () => {
-  const shipped = fs.readFileSync(process.env.GLYPHPOINT_APP || path.join(root, 'GlyphPoint-v1a-layout-fixed.html'), 'utf8');
+  const shipped = fs.readFileSync(process.env.GLYPHPOINT_APP || path.join(root, 'GlyphPoint-RC.html'), 'utf8');
   assert.ok(shipped.includes(moduleSource.trim()), 'Run npm run build before testing: shipped recovery code differs from src/recovery.js');
 });
 
@@ -535,4 +535,36 @@ test('compact JSON preserves projects that fit the import budget without pretty-
   assert.equal((await saver.save()).kind, 'downloaded');
   assert.equal(new TextEncoder().encode(downloads[0].text).byteLength, compactBytes);
   assert.deepEqual(JSON.parse(downloads[0].text), value);
+});
+
+
+test('large mostly blank fields have lossless compact recovery checkpoints', async () => {
+  const size=512*512;
+  const { recovery, state, store } = fixture({
+    validate: data => {
+      assert.equal(data.cols*data.rows, data.cells.length);
+      return data;
+    },
+  });
+  state.value = {format:'glyphpoint-v3',cols:512,rows:512,cells:Array.from({length:size},()=>({ch:' ',fg:'',bg:'',font:'DejaVu Sans Mono',bold:false,italic:false,underline:false}))};
+  state.value.cells[0].ch='A';state.value.cells[size-1].ch='Z';
+  recovery.touch();await recovery.flush();
+  const [stored] = store.records.values();
+  assert.equal(stored.encoding,'cell-rle-v1');
+  assert.ok(stored.bytes < 1024*16,'mostly empty large field must fit recovery archive');
+  const loaded=await recovery.read(stored.id);
+  assert.equal(loaded.project.cells.length,size);
+  assert.equal(loaded.project.cells[0].ch,'A');
+  assert.equal(loaded.project.cells[size-1].ch,'Z');
+  assert.notStrictEqual(loaded.project.cells[1], loaded.project.cells[2], 'unpacked cells must not alias');
+  await recovery.dispose();
+});
+
+test('compressed recovery rejects malformed runs without installing partial state', async () => {
+  const { recovery, store } = fixture({validate: data => data});
+  const malformed={format:'glyphpoint-v3',cols:8,rows:1,cellsRleV1:[[9,{ch:'A'}]]};
+  const payload=JSON.stringify(malformed);
+  store.records.set('bad',{format:'glyphpoint-recovery-v1',id:'bad',bytes:Buffer.byteLength(payload),encoding:'cell-rle-v1',payload});
+  await assert.rejects(recovery.read('bad'),/Malformed compressed recovery run/);
+  await recovery.dispose();
 });

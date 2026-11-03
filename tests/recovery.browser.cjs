@@ -168,7 +168,7 @@ async function run(browserName, fixtureURL) {
   const root = path.resolve(__dirname, '..');
   const [moduleSource, shipped] = await Promise.all([
     fs.readFile(path.join(root, 'src/recovery.js'), 'utf8'),
-    fs.readFile(process.env.GLYPHPOINT_APP || path.join(root, 'GlyphPoint-v1a-layout-fixed.html'), 'utf8'),
+    fs.readFile(process.env.GLYPHPOINT_APP || path.join(root, 'GlyphPoint-RC.html'), 'utf8'),
   ]);
   const start = shipped.indexOf(moduleSource.trim());
   assert.ok(start >= 0, 'Run npm run build: shipped recovery module differs from src/recovery.js');

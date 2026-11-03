@@ -4,7 +4,7 @@
 
 **Authority order:** current user task and repository controls → current maintained source/tests → this reference and the manual → historical audit/version snapshots. This reference documents behavior; it does not replace user authorization.
 
-**Maintained runtime:** [GlyphPoint-v1a-layout-fixed.html](GlyphPoint-v1a-layout-fixed.html). **Development sources:** [src/](src/app.js), assembled by [scripts/build.cjs](scripts/build.cjs). The November 2026 audit is historical evidence; the v3 implementation supersedes its former no-autosave, DOM-cell, code-point, and palette-only rendering limitations. Inspect Git history for the revision actually in use.
+**Maintained runtime:** [GlyphPoint-RC.html](GlyphPoint-RC.html). **Development sources:** [src/](src/app.js), assembled by [scripts/build.cjs](scripts/build.cjs). The November 2026 audit is historical evidence; the v3 implementation supersedes its former no-autosave, DOM-cell, code-point, and palette-only rendering limitations. Inspect Git history for the revision actually in use.
 
 ## Retrieval directory
 
@@ -66,21 +66,21 @@ Edit the source modules/template, then run `npm run build` to regenerate the mai
 
 ## GP-003 Allocation and data invariants
 
-**Keywords:** 512, 65536, 16 MiB, 4096, reserved space, 32 code points, Segmenter, validation.
+**Keywords:** 4096 axis, 1048576 cells, 256 MiB JSON, 16 MiB HTML, reserved space, 32 code points, Segmenter, validation.
 
 | Invariant | Requirement |
 | --- | --- |
-| Field dimensions | Integer 1–512 per axis; product ≤65,536. |
+| Field dimensions | Integer 1–4,096 per axis; product ≤1,048,576. |
 | Cell array | Exactly `cols * rows` valid cell records. |
-| Input file | ≤16 × 1024 × 1024 bytes before read/parse. |
+| Input file | JSON project ≤256 MiB; text, HTML, and palettes ≤16 MiB before read/parse. |
 | Palette | ≤4,096 unique valid graphemes, including mandatory U+0020 space. |
 | Space | Cannot be removed/renamed; erasing writes inherited blank cells. |
 | Glyph | One extended grapheme cluster; ≤32 code points; no C0/C1 controls, lone surrogates, U+2028/U+2029. |
 | v3 cell colours | Empty/omitted or six-digit hex; invalid supplied overrides are rejected. |
 | Field background | Required normalized six-digit hex after default handling. |
 | Font | Fixed `SAFE_FONTS` allowlist; unknown input becomes a safe fallback. |
-| History | Combined undo+redo ≤60 snapshots and ≤262,144 cell records. |
-| Recovery | ≤12 checkpoints / 32 MiB UTF-8 payloads; one project ≤16 MiB. |
+| History | Combined undo+redo ≤60 snapshots and ≤2,097,152 cell records. |
+| Recovery | ≤12 checkpoints / 32 MiB stored payloads; ≤16 MiB per checkpoint. Large uniform documents use lossless RLE. |
 | Selection | Bounds and mask positions must be valid after placement and clipping. |
 
 `GPInterchange.splitGraphemes` and `validGrapheme` use `Intl.Segmenter`; older engines retain ASCII support and explicitly reject unsupported Unicode. Do not replace this with `Array.from` for new v3 text. Code-point counting is still required when validating a v1/v2 cell and the 32-code-point cluster budget. Preserve the original sequence; there is no automatic NFC normalization.
@@ -118,7 +118,7 @@ There is no canvas localStorage fallback. Pending/saving/saved/unavailable/error
 
 `GPRecovery.createFileSaver({capture,validate,getName,getRevision,download,report})` exposes `save({saveAs,download})`, `reset()`, `capabilities()`, and `isCurrentDocument(result)`. The picker is invoked before awaiting asynchronous work, preserving the initiating user gesture. Its handle is reused only in the current document. New/Open resets it. Save snapshots the payload and revision before any picker/write delay.
 
-Only a successful writable-stream `close()` returns `kind:'saved'`; `current` also verifies document identity/revision. Root `saveProject` rechecks `isCurrentDocument(result)` after its await before adopting the destination filename, and additionally requires current/revision equality before clearing dirty state. A successful Save As updates the displayed destination for the same document even when newer edits remain unsaved. Picker cancellation, interrupted write, permission/close failure, and competing saves return distinct non-success outcomes. Explicit Download or absent direct-file support returns `kind:'downloaded'`, meaning requested, and retains dirty state. JSON is compacted if indentation would break the 16 MiB round-trip budget.
+Only a successful writable-stream `close()` returns `kind:'saved'`; `current` also verifies document identity/revision. Root `saveProject` rechecks `isCurrentDocument(result)` after its await before adopting the destination filename, and additionally requires current/revision equality before clearing dirty state. A successful Save As updates the displayed destination for the same document even when newer edits remain unsaved. Picker cancellation, interrupted write, permission/close failure, and competing saves return distinct non-success outcomes. Explicit Download or absent direct-file support returns `kind:'downloaded'`, meaning requested, and retains dirty state. JSON is compacted if indentation would break the 256 MiB round-trip budget.
 
 Beforeunload requests browser protection for dirty content. Visibility/pagehide flushing and IDB commit improve recovery but do not guarantee survival of immediate termination, eviction, profile loss, or cleared site data. Keep portable files for independent backups.
 

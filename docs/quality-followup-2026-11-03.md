@@ -57,3 +57,7 @@ The hosted profiles are Linux Chromium/Firefox/WebKit full workflows, Windows Ch
 The owner must select the project license and copyright name. [Release process](release-process.md) describes the concrete package and workflow awaiting that choice. This candidate does not invent a license or claim that a GitHub Release was published.
 
 Physical device/screen-reader testing cannot be replaced with a headless CI result. [Platform qualification](platform-qualification.md) supplies the actual workflows and record template for Windows/macOS/mobile, native saving, touch/stylus, printing, NVDA and VoiceOver. Report observed failures against the tested commit rather than claiming universal accessibility or device support.
+
+## Canonical entry point and larger-field correction
+
+`GlyphPoint-RC.html` is the canonical standalone editor. The historical `GlyphPoint-v1a-layout-fixed.html` path is now a small compatibility launcher, not another application build. Field limits increased to 4,096 cells per axis and 1,048,576 cells total; JSON projects have a 256 MiB file budget, whereas palette/text/HTML imports and HTML exports remain 16 MiB. Large mostly uniform browser-local checkpoints use lossless cell-run encoding. The viewport remains bounded, but dense document state, worker copies, Undo snapshots, and project serialization scale with total cell count and can be expensive.

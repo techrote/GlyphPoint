@@ -2,7 +2,7 @@
 
 GlyphPoint makes pictures from a grid of characters. Paint with letters and symbols, colour individual cells, add text and shapes, and keep an editable project. It runs from one offline HTML file with an included font, automatic local recovery, keyboard editing, and mouse/touch controls. No account, build tools, or server are required to start.
 
-This guide uses **`GlyphPoint-v1a-layout-fixed.html`**, the maintained editor. Other versioned HTML files are historical snapshots. Use the [instruction manual](manual.md) for the complete reference and the [repository overview](../readme.md) for development documentation, including [agent working instructions](../AGENTS.md).
+This guide uses **`GlyphPoint-RC.html`**, the maintained editor. Other versioned HTML files are historical snapshots. Use the [instruction manual](manual.md) for the complete reference and the [repository overview](../readme.md) for development documentation, including [agent working instructions](../AGENTS.md).
 
 ## Contents
 
@@ -19,7 +19,7 @@ This guide uses **`GlyphPoint-v1a-layout-fixed.html`**, the maintained editor. O
 ## Get the editor
 
 1. Open the [GlyphPoint repository](https://github.com/techrote/GlyphPoint).
-2. Choose **Code → Download ZIP**, then extract the ZIP. Alternatively, open `GlyphPoint-v1a-layout-fixed.html` in GitHub and choose **Download raw file**.
+2. Choose **Code → Download ZIP**, then extract the ZIP. Alternatively, open `GlyphPoint-RC.html` in GitHub and choose **Download raw file**.
 3. Open the downloaded HTML file in a current browser. Double-clicking usually opens the associated browser; its **Open File** command is another option.
 4. Check that you see **GlyphPoint**, tools, and a blank grid. A GitHub source viewer or a page of HTML text is not the running editor.
 
@@ -43,7 +43,7 @@ Linux or macOS:
 python3 -m http.server 8000 --bind 127.0.0.1
 ```
 
-Open [http://127.0.0.1:8000/GlyphPoint-v1a-layout-fixed.html](http://127.0.0.1:8000/GlyphPoint-v1a-layout-fixed.html). Leave the terminal running while using that address; press `Ctrl+C` there to stop it. The server serves the editor file and does not receive your artwork.
+Open [http://127.0.0.1:8000/GlyphPoint-RC.html](http://127.0.0.1:8000/GlyphPoint-RC.html). Leave the terminal running while using that address; press `Ctrl+C` there to stop it. The server serves the editor file and does not receive your artwork.
 
 Use the same browser, profile, address, and port when you want the same recovery archive. A local `file:` copy, localhost copy, different browser, or private window can have separate storage. Use a JSON project to move artwork between them.
 
@@ -178,7 +178,7 @@ PNG and Print render the whole field without gridlines, selection outlines, or t
 - [Resize, skew, and properties](manual.md#resize-skew-and-properties): distinguish field boundaries from resampling and choose expansion deliberately.
 - [File formats and exports](manual.md#file-formats-and-exports): learn what JSON, external HTML, text, and images preserve.
 
-The field supports **1–512 cells per axis** and **65,536 cells total**. A palette holds **4,096 graphemes including reserved space**, and each grapheme is limited to **32 code points**. Imported files are limited to **16 MiB**. Operations that exceed the limits are rejected before replacing the drawing.
+The field supports **1–4,096 cells per axis** and **1,048,576 cells total**. A palette holds **4,096 graphemes including reserved space**, and each grapheme is limited to **32 code points**. JSON projects can be up to **256 MiB**; palette, text, and HTML imports are limited to **16 MiB**. Operations that exceed the limits are rejected before replacing the drawing.
 
 ## If something goes wrong
 

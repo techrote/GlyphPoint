@@ -126,7 +126,7 @@ function initWorkflows(){
     if(s.state==='error'||s.state==='unavailable')setMessage(s.message);
   }});
   recovery.attachLifecycle(window,document);
-  fileSaver=GPRecovery.createFileSaver({capture:projectPayload,validate:normaliseProject,getName:()=>state.docName,getRevision:()=>documentRevision,download:downloadBlob,report:s=>setMessage(s.message)});
+  fileSaver=GPRecovery.createFileSaver({maxFileBytes:MAX_FILE_BYTES,capture:projectPayload,validate:normaliseProject,getName:()=>state.docName,getRevision:()=>documentRevision,download:downloadBlob,report:s=>setMessage(s.message)});
   const direct=fileSaver.capabilities().direct;
   $('[data-file="saveAs"]').disabled=!direct;
   $('[data-file="saveProject"]').title=direct?'Choose a project file once, then save back to it.':'This browser saves a portable project through its download interface.';

@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const playwright = require('playwright');
 
-const appPath = process.env.GLYPHPOINT_APP || path.join(__dirname, '..', 'GlyphPoint-v1a-layout-fixed.html');
+const appPath = process.env.GLYPHPOINT_APP || path.join(__dirname, '..', 'GlyphPoint-RC.html');
 const html = fs.readFileSync(appPath, 'utf8');
 const rendererSource = html.match(/\/\* GP_RENDERER_BEGIN \*\/[\s\S]*?\/\* GP_RENDERER_END \*\//)?.[0];
 assert.ok(rendererSource, 'Build the maintained HTML before running renderer browser tests.');

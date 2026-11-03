@@ -2,7 +2,7 @@
 
 This document separates implemented workflows, automated evidence, and physical-device acceptance. It provides repeatable tests for the current v3 editor; a listed procedure is not a claim that somebody has executed it.
 
-Use the [manual](manual.md) for control details, [format reference](project-format.md) for data contracts, and [Quality workflow](../.github/workflows/quality.yml) for the actual automated profiles. Test the maintained **GlyphPoint-v1a-layout-fixed.html** from the candidate being assessed.
+Use the [manual](manual.md) for control details, [format reference](project-format.md) for data contracts, and [Quality workflow](../.github/workflows/quality.yml) for the actual automated profiles. Test the maintained **GlyphPoint-RC.html** from the candidate being assessed.
 
 ## Evidence status
 

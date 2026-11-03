@@ -10,7 +10,7 @@ const path = require('node:path');
 const {pathToFileURL} = require('node:url');
 const playwright = require('playwright');
 
-const appPath = path.resolve(process.env.GLYPHPOINT_APP || path.join(__dirname, '..', 'GlyphPoint-v1a-layout-fixed.html'));
+const appPath = path.resolve(process.env.GLYPHPOINT_APP || path.join(__dirname, '..', 'GlyphPoint-RC.html'));
 const appURL = pathToFileURL(appPath).href;
 const requestedBrowsers = process.argv.slice(2);
 const browserNames = requestedBrowsers.length ? requestedBrowsers : ['chromium', 'firefox'];

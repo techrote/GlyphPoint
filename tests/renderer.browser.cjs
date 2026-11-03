@@ -130,6 +130,38 @@ async function runRendererBrowser(browserName) {
             if (samples.length < 8) samples.push({x,y,channel: i % 4, viewport: art[i], preencoded: beforeEncoding?.[i], png: exported[i]});
           }
         }
+        // Two independent WebKit Canvas2D contexts may hint/antialias glyphs
+        // differently, even at the same origin. Compare their meaningful ink
+        // coverage within one pixel; verify PNG serialization separately above.
+        const inkChecks = [];
+        const cellBackgrounds = [[0,0,255],[1,2,3],[18,19,20],[1,2,3],[1,2,3]];
+        for (let cell = 0; cell < 5; cell++) {
+          const x0 = (cell % 3) * 16, y0 = Math.floor(cell / 3) * 16, background = cellBackgrounds[cell];
+          const inkMask = pixels => {
+            const mask = new Uint8Array(16 * 16);
+            for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+              const i = ((y0 + y) * width + x0 + x) * 4;
+              const delta = Math.max(...background.map((value, k) => Math.abs(pixels[i + k] - value)));
+              if (delta >= 12) mask[y * 16 + x] = 1;
+            }
+            return mask;
+          };
+          const viewport = inkMask(art), png = inkMask(beforeEncoding);
+          const misses = (a, b) => {
+            let missed = 0;
+            for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (a[y * 16 + x]) {
+              let nearby = false;
+              for (let dy = -1; dy <= 1 && !nearby; dy++) for (let dx = -1; dx <= 1; dx++) {
+                const xx = x + dx, yy = y + dy;
+                if (xx >= 0 && xx < 16 && yy >= 0 && yy < 16 && b[yy * 16 + xx]) { nearby = true; break; }
+              }
+              if (!nearby) missed++;
+            }
+            return missed;
+          };
+          inkChecks.push({cell, inkViewport:viewport.reduce((a,b)=>a+b,0), inkPNG:png.reduce((a,b)=>a+b,0),
+            missViewport:misses(viewport,png), missPNG:misses(png,viewport)});
+        }
         for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
           const p = bg(x, y), q = bg(x + 16, y);
           if (p[0] > 200 && p[1] < 10 && p[2] < 10) red++;
@@ -137,13 +169,23 @@ async function runRendererBrowser(browserName) {
           const b = bg(x + 32, y + 16); if (b[0] !== 68 || b[1] !== 85 || b[2] !== 102 || b[3] !== 255) blankContamination++;
         }
         return {type: blob.type, width: output.width, height: output.height, mismatchedPixels, maxChannelDelta, channelsOverTwo, samples,
-          captured: Boolean(beforeEncoding), paintMismatch, roundtripMismatch, maxPaintDelta, maxRoundtripDelta, byCell,
+          captured: Boolean(beforeEncoding), paintMismatch, roundtripMismatch, maxPaintDelta, maxRoundtripDelta, byCell, inkChecks,
           red, green, blankContamination, backgrounds: [bg(0, 0), bg(16, 0), bg(32, 0)], drawn};
       });
       assert.equal(result.type, 'image/png');
       assert.deepEqual([result.width, result.height], [48, 32]);
       assert.equal(result.captured, true, 'PNG encoding receives a complete export canvas');
-      assert.equal(result.mismatchedPixels, 0, `PNG viewport/paint/codec comparison (${JSON.stringify({paintMismatch: result.paintMismatch, roundtripMismatch: result.roundtripMismatch, maxPaintDelta: result.maxPaintDelta, maxRoundtripDelta: result.maxRoundtripDelta, maxChannelDelta: result.maxChannelDelta, channelsOverTwo: result.channelsOverTwo, byCell: result.byCell, samples: result.samples})})`);
+      assert.equal(result.roundtripMismatch, 0, 'PNG serialization and decoding preserve every export canvas channel');
+      if (browserName === 'webkit') {
+        // Do not confuse font hinting/antialias differences between two
+        // WebKit canvases with lossy PNG data. Require coverage within 1 px.
+        for (const check of result.inkChecks) {
+          assert.ok(check.inkViewport > 0 && check.inkPNG > 0, `Cell ${check.cell} retains visible glyph ink`);
+          assert.equal(check.missViewport + check.missPNG, 0, `WebKit glyph coverage differs by more than one pixel (${JSON.stringify(check)})`);
+        }
+      } else {
+        assert.equal(result.mismatchedPixels, 0, `Viewport and export canvas pixels match exactly (${JSON.stringify({byCell: result.byCell, samples: result.samples})})`);
+      }
       assert.deepEqual(result.backgrounds, [[0, 0, 255, 255], [1, 2, 3, 255], [18, 19, 20, 255]]);
       assert.ok(result.red > 0 && result.green > 0, 'The same glyph supports independent foreground colours');
       assert.equal(result.blankContamination, 0, 'Wide glyphs and italics cannot paint a neighbouring cell');
